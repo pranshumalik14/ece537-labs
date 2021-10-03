@@ -91,7 +91,7 @@ histogram(R)
 md"
 
 ## Code
-Note that all code for this lab is indivudal effort, is tracked by git here: https://github.com/pranshumalik14/ece537-labs.
+Note that all code for this lab can be run on the cloud and viewed as is at the github repository hosted page [here](https://pranshumalik14.github.io/ece537-labs/lab1/lab1.jl.html) (https://pranshumalik14.github.io/ece537-labs/lab1/lab1.jl.html)
 
 "
 
