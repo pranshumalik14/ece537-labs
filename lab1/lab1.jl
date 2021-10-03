@@ -5,7 +5,7 @@ using Markdown
 using InteractiveUtils
 
 # ╔═╡ 8b31063c-2246-11ec-03b9-61538108208f
-using Distributions, Plots, Statistics
+using Random, Distributions, Plots, Statistics
 
 # ╔═╡ 9607249e-6e65-4c4b-8d3f-00a1767eeb81
 md"
@@ -16,8 +16,76 @@ In this lab, we are supposed to create distributions, sample, and test for indep
 
 "
 
+# ╔═╡ 71da984a-82b4-4ec4-902e-0c1ed7a47f05
+import Random: AbstractRNG
+
+# ╔═╡ 8f5ad170-0f11-4afd-bee3-32de54d4206a
+import Distributions: ContinuousUnivariateDistribution, @check_args, @distr_support
+
+# ╔═╡ 0dff3c7e-af8e-4e72-baa3-9fd1a0f03a52
+md"
+
+## Simulating Univariate Random Variables
+
+We define an R.V. $Z$ with cdf 
+
+$F_Z(z) = 
+\begin{cases} 
+	0, & z \lt 0\\
+	0.5z, & 0 \leq z \lt 1\\
+	0.25 + 0.25z, & 1 \leq z \lt 3\\
+	1, & z \geq 3
+\end{cases}$ 
+
+"
+
+# ╔═╡ b744a3e5-ff62-4032-b511-9fbf6c3e1806
+md"
+
+Now, in order to define this R.V. we can define a distribution with the given cdf using the Distributions.jl package. 
+
+"
+
+# ╔═╡ c9324b3e-ffd2-4ab9-b48c-d057e3e22e30
+struct ZDist{T<:Real} <: ContinuousUnivariateDistribution
+    a::T
+    b::T
+    c::T
+	
+    ZDist{T}(a::T, b::T, c::T) where {T <: Real} = new{T}(a, b, c)
+	
+	function ZDist(a::T, b::T, c::T; check_args=true) where {T <: Real}
+    	check_args && @check_args(ZDist, a <= b <= c)
+    	return new{T}(a, b, c)
+	end
+	
+	ZDist(a::Real, b::Real, c::Real) = ZDist(promote(a, b, c)...)
+	ZDist(a::Integer, b::Integer, c::Integer) = ZDist(float(a), float(b), float(c))
+end
+
 # ╔═╡ 69417ab5-d9d6-4b42-8e10-7a1a52e684ae
-x = 1
+begin
+	@distr_support ZDist d.a d.c
+	params(d::ZDist) = (d.a, d.b, d.c)
+end
+
+# ╔═╡ 4feb2633-e8c8-4749-ba0f-82446f274a68
+function Base.rand(rng::AbstractRNG, d::ZDist)
+    (a, b, c) = params(d)
+	u = rand(0:1)
+    u₁ = a + (b - a) * rand(rng)
+	u₂ = b + (c - b) * rand(rng)
+    return (1-u) * u₁ + u * u₂
+end
+
+# ╔═╡ e0968057-8310-4d48-aa72-3a1bf2399f5d
+𝒵 = ZDist(0, 1, 3)
+
+# ╔═╡ 2faf437b-cbca-482a-b27e-eab22594f392
+R = rand(𝒵, 100000000)
+
+# ╔═╡ 096a37b3-d8a0-4910-9906-4b52c3b430e8
+histogram(R)
 
 # ╔═╡ 3a18cc87-1508-483e-9c2d-fa579e7edab4
 md"
@@ -32,6 +100,7 @@ PLUTO_PROJECT_TOML_CONTENTS = """
 [deps]
 Distributions = "31c24e10-a181-5473-b8eb-7969acd0382f"
 Plots = "91a5bcdd-55d7-5caf-9e0b-520d859cae80"
+Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
 Statistics = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
 
 [compat]
@@ -935,7 +1004,16 @@ version = "0.9.1+5"
 # ╔═╡ Cell order:
 # ╟─9607249e-6e65-4c4b-8d3f-00a1767eeb81
 # ╠═8b31063c-2246-11ec-03b9-61538108208f
+# ╠═71da984a-82b4-4ec4-902e-0c1ed7a47f05
+# ╠═8f5ad170-0f11-4afd-bee3-32de54d4206a
+# ╟─0dff3c7e-af8e-4e72-baa3-9fd1a0f03a52
+# ╟─b744a3e5-ff62-4032-b511-9fbf6c3e1806
+# ╠═c9324b3e-ffd2-4ab9-b48c-d057e3e22e30
 # ╠═69417ab5-d9d6-4b42-8e10-7a1a52e684ae
+# ╠═4feb2633-e8c8-4749-ba0f-82446f274a68
+# ╠═e0968057-8310-4d48-aa72-3a1bf2399f5d
+# ╠═2faf437b-cbca-482a-b27e-eab22594f392
+# ╠═096a37b3-d8a0-4910-9906-4b52c3b430e8
 # ╟─3a18cc87-1508-483e-9c2d-fa579e7edab4
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
