@@ -4,8 +4,20 @@
 using Markdown
 using InteractiveUtils
 
+# This Pluto notebook uses @bind for interactivity. When running this notebook outside of Pluto, the following 'mock version' of @bind gives bound variables a default value (instead of an error).
+macro bind(def, element)
+    quote
+        local el = $(esc(element))
+        global $(esc(def)) = Core.applicable(Base.get, el) ? Base.get(el) : missing
+        el
+    end
+end
+
 # ╔═╡ 8b31063c-2246-11ec-03b9-61538108208f
-using Random, Distributions, StatsBase, StatsPlots, LinearAlgebra
+using Random, Distributions, StatsBase, StatsPlots, LinearAlgebra, DataFrames, LaTeXStrings, PlutoUI
+
+# ╔═╡ 61353ab9-eefb-46e7-87a4-da100bd49d53
+PlutoUI.TableOfContents()
 
 # ╔═╡ 9607249e-6e65-4c4b-8d3f-00a1767eeb81
 md"
@@ -25,17 +37,19 @@ import Distributions: ContinuousUnivariateDistribution, @check_args, @distr_supp
 # ╔═╡ 0dff3c7e-af8e-4e72-baa3-9fd1a0f03a52
 md"
 
-## Simulating Univariate Random Variables
+## 1. Simulating Univariate Random Variables
 
 We define an R.V. $Z$ with cdf 
 
 $F_Z(z) = 
 \begin{cases} 
-	0, & z \lt 0\\
-	0.5z, & 0 \leq z \lt 1\\
-	0.25 + 0.25z, & 1 \leq z \lt 3\\
-	1, & z \geq 3
+	0, & z \lt a\\
+	\frac{z-a}{2(b-a)}, & a \leq z \lt b\\
+	\frac{1}{2} + \frac{z-b}{2(c-b)}, & b \leq z \lt c\\
+	1, & z \geq c
 \end{cases}$ 
+
+which has mean, $E[Z] = xyz$, and variance, $\text{VAR}[Z] = zyx$.
 
 "
 
@@ -81,42 +95,224 @@ end
 # ╔═╡ e0968057-8310-4d48-aa72-3a1bf2399f5d
 𝒵 = ZDist(0, 1, 3);
 
+# ╔═╡ 19d918cc-b1d3-4058-8386-e1288fac8290
+md"
+
+### 1.1 Testing simulation
+𝑁₁ = $(@bind N₁ Slider(50:50:10000; show_value=true, default=3000))
+
+"
+
 # ╔═╡ 2faf437b-cbca-482a-b27e-eab22594f392
-𝒵samples = rand(𝒵, 1000)
+𝒵samples = rand(𝒵, N₁)
 
 # ╔═╡ 096a37b3-d8a0-4910-9906-4b52c3b430e8
 h = fit(Histogram, 𝒵samples);
 
 # ╔═╡ 0f08e144-af53-48c8-bf79-f1bb73b7505e
-normalize(h; mode=:pdf)|> plot
+begin
+	normalhist = normalize(h; mode=:pdf)
+	plot(normalhist; legend=false)
+	xlabel!(L"Z")
+	ylabel!("Normalized Density")
+	title!("Normalized Histogram of Z over N₁ Samples")
+end
 
 # ╔═╡ 041acb21-230f-4f52-b100-bcb41fcace75
-cdf(x) = ecdf(𝒵samples)(x)
+begin
+	cdf(x) = ecdf(𝒵samples)(x);
+	z = 𝒵.a:0.025:𝒵.c;
+	Fz = cdf.(z);
+	fz = diff(Fz)./diff(z);
+end
 
 # ╔═╡ 9fbd24fb-734f-46ce-9054-9d91f41c3771
 begin
-	plot(cdf, 𝒵.a:0.01:𝒵.c)
+	plot(cdf, z; legend=false)
+	xlabel!(L"Z")
+	ylabel!(L"F_Z(z)")
+	title!("Empirical cdf")
 end
+
+# ╔═╡ 64e48ba7-0a94-4958-a290-8852b118c1a2
+begin
+	plot(z[1:end-1], fz; legend=false)
+	xlabel!(L"Z")
+	ylabel!(L"f_Z(z)")
+	title!("Empirical pdf")
+end
+
+# ╔═╡ c0073c0b-b582-4740-b392-864058509ef0
+𝒵mean = sum(𝒵samples)/length(𝒵samples)
+
+# ╔═╡ 2986b6f9-c4d4-4a25-aa42-224be0ba511a
+𝒵var = var(𝒵samples)
+
+# ╔═╡ afdd6b30-a443-480c-8dbc-d9b2cbc428f0
+md"
+
+### 1.2 Summary of Results
+
+Here is a table of results and graphs for means ans vars over sizes for particular runs.
+
+"
+
+# ╔═╡ fb5f69e0-5e71-4e86-89dd-617e32892192
+md"
+
+## 2. Independence of Discrete Random Variables
+
+In this section we describe a [categorical distribution](https://en.wikipedia.org/wiki/Categorical_distribution) pmf (uses the [Alias method](https://en.wikipedia.org/wiki/Alias_method) under the hood).
+
+First, we can start with defining the probablity vector, $p$, with $k = 6$ categories/bins.
+
+"
+
+# ╔═╡ 3e2c91cd-23b2-478f-815c-86821d2ccb8d
+p = [0.25, 0.25, 0.125, 0.125, 0.125, 0.125];
+
+# ╔═╡ 194eba3b-a6c5-4207-8ba9-21b1aed0d47e
+md"
+
+Talk about or introduce the variables X, Y, Z1, Z2 and introduce the task.
+
+"
+
+# ╔═╡ 959d54eb-ea04-4380-8b4e-ec04da1c4ddb
+md"
+
+### 2.1 Testing sims
+𝑁₂ = $(@bind N₂ Slider(50:50:2500; show_value=true, default=500))
+
+"
+
+# ╔═╡ 45680b4d-6201-4d0f-be67-b122923d1820
+function matrixtotuple(x::AbstractMatrix{T}) where T
+	r,c = size(x)	
+	pts = Vector{Tuple}(undef,c)
+	@time @inbounds for i in 1:c
+		pts[i] = Tuple(x[:,i])
+	end
+	return pts
+end
+
+# ╔═╡ 95b61cf9-b993-4b05-90c7-3e1ccf2c25e5
+begin
+	𝑋  = Categorical(p);
+	𝑌  = Categorical(p);
+	𝑋𝑌 = Product([𝑋, 𝑌]);
+	
+	𝑋𝑌samples = rand(𝑋𝑌, N₂) |> matrixtotuple
+end
+
+# ╔═╡ d5e14cec-04e4-4513-8a1f-9c0fd086ab9d
+begin
+	𝑍₁ = [xy[1] + xy[2] for xy in 𝑋𝑌samples] |> transpose
+	𝑍₂ = [xy[1] - xy[2] for xy in 𝑋𝑌samples] |> transpose
+	
+	𝑍₁𝑍₂samples = vcat(𝑍₁, 𝑍₂) |> matrixtotuple
+end
+
+# ╔═╡ 7b0cbbf2-6b17-4cad-a1b7-41703463a48d
+md"
+
+The empiricial joint pmf is given below.
+
+"
+
+# ╔═╡ 1681aacb-4f0f-449c-999c-9d57fcf19472
+begin
+	scatter(𝑋𝑌samples; alpha=20.0/N₂, legend=false, markersize=20)
+	xlabel!(L"X")
+	ylabel!(L"Y")
+	title!(L"p_{X,Y}(x,y)")
+	xlims!(0.5, 6.5)
+	ylims!(0.5, 6.5)
+end
+
+# ╔═╡ 267d7b8c-da35-426e-ad06-e9d8819f2728
+md"
+
+From the simulation, they do not look independent, since low values imply more possibility.
+
+"
+
+# ╔═╡ 3bb7548b-d497-4263-80f3-f7c435647d87
+begin
+	scatter(𝑍₁𝑍₂samples; alpha=20.0/N₂, legend=false, markersize=20)
+	xlabel!(L"Z_1")
+	ylabel!(L"Z_2")
+	title!(L"p_{Z_1,Z_2}(z_1,z_2)")
+	xlims!(1.5, 12.5)
+	ylims!(-6, 6)
+	xticks!(1:1:12)
+	yticks!(-5:1:5)
+end
+
+# ╔═╡ 791b5707-cc1e-4892-a761-f9680bc15cec
+md"
+
+### 2.2 Summary of Results
+
+Note on how to calculate empiracal pmfs and then how to test for independence.
+Here is a table. The empirical pmf for X and Y, $p_{X, Y}(x,y)$, is:
+
+"
+
+# ╔═╡ 645bcb94-4d64-4006-8532-55e5aaa01ad5
+begin
+	N = 100 # fixed number of samples
+	𝑋𝑌fixedsamples = rand(𝑋𝑌, N) |> matrixtotuple
+	
+	𝑋𝑌fixedpmf = zeros(6,6)
+	DataFrame(𝑋𝑌fixedpmf, ["1", "2", "3", "4", "5", "6"])
+end
+
+# ╔═╡ f71d4aea-f51a-406b-8f5c-85a5aa1a8949
+# marginal pmfs for X and Y
+
+# ╔═╡ a24f058f-92ff-490c-80a6-7f3e7d98184d
+begin
+	𝑍₁fixed        = [xy[1] + xy[2] for xy in 𝑋𝑌fixedsamples] |> transpose
+	𝑍₂fixed        = [xy[1] - xy[2] for xy in 𝑋𝑌fixedsamples] |> transpose
+	
+	𝑍₁𝑍₂fixedsamples = vcat(𝑍₁fixed, 𝑍₂fixed) |> matrixtotuple
+	
+	𝑍₂𝑍₁fixedpmf = zeros(12, 11)
+	# loop
+	
+	DataFrame(𝑍₂𝑍₁fixedpmf, 
+		["-5", "-4", "-3", "-2", "-1", "0", "1", "2", "3", "4", "5"])
+end
+
+# ╔═╡ 13702d28-557f-4465-9e6f-37ce2779272c
+# marginal pmfs for Z1, Z2
 
 # ╔═╡ 3a18cc87-1508-483e-9c2d-fa579e7edab4
 md"
 
-## Code
-Note that all code for this lab can be run on the cloud and viewed as is at the github repository hosted page [here](https://pranshumalik14.github.io/ece537-labs/lab1/lab1.jl.html) (https://pranshumalik14.github.io/ece537-labs/lab1/lab1.jl.html)
+## 3. Code
+Note that all code for this lab can be run on the cloud and viewed as is at the github repository hosted page [here](https://pranshumalik14.github.io/ece537-labs/lab1/lab1.jl.html).
 
 "
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
 [deps]
+DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
 Distributions = "31c24e10-a181-5473-b8eb-7969acd0382f"
+LaTeXStrings = "b964fa9f-0449-5b57-a5c2-d3ea65f4040f"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
+PlutoUI = "7f904dfe-b85e-4ff6-b463-dae2292396a8"
 Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
 StatsBase = "2913bbd2-ae8a-5f71-8c99-4fb6c76f3a91"
 StatsPlots = "f3b207a7-027a-5e70-b257-86293d7955fd"
 
 [compat]
+DataFrames = "~1.2.2"
 Distributions = "~0.25.16"
+LaTeXStrings = "~1.2.1"
+PlutoUI = "~0.7.15"
 StatsBase = "~0.33.10"
 StatsPlots = "~0.14.28"
 """
@@ -222,10 +418,21 @@ git-tree-sha1 = "9f02045d934dc030edad45944ea80dbd1f0ebea7"
 uuid = "d38c429a-6771-53c6-b99e-75d170b6e991"
 version = "0.5.7"
 
+[[Crayons]]
+git-tree-sha1 = "3f71217b538d7aaee0b69ab47d9b7724ca8afa0d"
+uuid = "a8cc5b0e-0ffa-5ad4-8c14-923d3ee1735f"
+version = "4.0.4"
+
 [[DataAPI]]
 git-tree-sha1 = "cc70b17275652eb47bc9e5f81635981f13cea5c8"
 uuid = "9a962f9c-6df0-11e9-0e5d-c546b8b5ee8a"
 version = "1.9.0"
+
+[[DataFrames]]
+deps = ["Compat", "DataAPI", "Future", "InvertedIndices", "IteratorInterfaceExtensions", "LinearAlgebra", "Markdown", "Missings", "PooledArrays", "PrettyTables", "Printf", "REPL", "Reexport", "SortingAlgorithms", "Statistics", "TableTraits", "Tables", "Unicode"]
+git-tree-sha1 = "d785f42445b63fc86caa08bb9a9351008be9b765"
+uuid = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
+version = "1.2.2"
 
 [[DataStructures]]
 deps = ["Compat", "InteractiveUtils", "OrderedCollections"]
@@ -350,6 +557,10 @@ git-tree-sha1 = "aa31987c2ba8704e23c6c8ba8a4f769d5d7e4f91"
 uuid = "559328eb-81f9-559d-9380-de523a88c83c"
 version = "1.0.10+0"
 
+[[Future]]
+deps = ["Random"]
+uuid = "9fa8497b-333b-5362-9e8d-4d0656e87820"
+
 [[GLFW_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Libglvnd_jll", "Pkg", "Xorg_libXcursor_jll", "Xorg_libXi_jll", "Xorg_libXinerama_jll", "Xorg_libXrandr_jll"]
 git-tree-sha1 = "dba1e8614e98949abfa60480b13653813d8f0157"
@@ -409,6 +620,23 @@ git-tree-sha1 = "8a954fed8ac097d5be04921d595f741115c1b2ad"
 uuid = "2e76f6c2-a576-52d4-95c1-20adfe4de566"
 version = "2.8.1+0"
 
+[[Hyperscript]]
+deps = ["Test"]
+git-tree-sha1 = "8d511d5b81240fc8e6802386302675bdf47737b9"
+uuid = "47d2ed2b-36de-50cf-bf87-49c2cf4b8b91"
+version = "0.0.4"
+
+[[HypertextLiteral]]
+git-tree-sha1 = "f6532909bf3d40b308a0f360b6a0e626c0e263a8"
+uuid = "ac1192a8-f4b3-4bfe-ba22-af5b92cd3ab2"
+version = "0.9.1"
+
+[[IOCapture]]
+deps = ["Logging", "Random"]
+git-tree-sha1 = "f7be53659ab06ddc986428d3a9dcc95f6fa6705a"
+uuid = "b5f81e59-6552-4d32-b1f0-c071b021bf89"
+version = "0.2.2"
+
 [[IniFile]]
 deps = ["Test"]
 git-tree-sha1 = "098e4d2c533924c921f9f9847274f2ad89e018b8"
@@ -430,6 +658,11 @@ deps = ["AxisAlgorithms", "ChainRulesCore", "LinearAlgebra", "OffsetArrays", "Ra
 git-tree-sha1 = "61aa005707ea2cebf47c8d780da8dc9bc4e0c512"
 uuid = "a98d9a8b-a2ab-59e6-89dd-64a1c18fca59"
 version = "0.13.4"
+
+[[InvertedIndices]]
+git-tree-sha1 = "bee5f1ef5bf65df56bdd2e40447590b272a5471f"
+uuid = "41ab1584-1d38-5bbf-9106-f11c6c58b48f"
+version = "1.1.0"
 
 [[IrrationalConstants]]
 git-tree-sha1 = "f76424439413893a832026ca355fe273e93bce94"
@@ -734,10 +967,28 @@ git-tree-sha1 = "cfbd033def161db9494f86c5d18fbf874e09e514"
 uuid = "91a5bcdd-55d7-5caf-9e0b-520d859cae80"
 version = "1.22.3"
 
+[[PlutoUI]]
+deps = ["Base64", "Dates", "Hyperscript", "HypertextLiteral", "IOCapture", "InteractiveUtils", "JSON", "Logging", "Markdown", "Random", "Reexport", "UUIDs"]
+git-tree-sha1 = "633f8a37c47982bff23461db0076a33787b17ecd"
+uuid = "7f904dfe-b85e-4ff6-b463-dae2292396a8"
+version = "0.7.15"
+
+[[PooledArrays]]
+deps = ["DataAPI", "Future"]
+git-tree-sha1 = "a193d6ad9c45ada72c14b731a318bedd3c2f00cf"
+uuid = "2dfb63ee-cc39-5dd5-95bd-886bf059d720"
+version = "1.3.0"
+
 [[Preferences]]
 deps = ["TOML"]
 git-tree-sha1 = "00cfd92944ca9c760982747e9a1d0d5d86ab1e5a"
 uuid = "21216c6a-2e73-6563-6e65-726566657250"
+version = "1.2.2"
+
+[[PrettyTables]]
+deps = ["Crayons", "Formatting", "Markdown", "Reexport", "Tables"]
+git-tree-sha1 = "69fd065725ee69950f3f58eceb6d144ce32d627d"
+uuid = "08abe8d2-0d0c-5749-adfa-8a2ac140af0d"
 version = "1.2.2"
 
 [[Printf]]
@@ -1160,6 +1411,7 @@ version = "0.9.1+5"
 """
 
 # ╔═╡ Cell order:
+# ╟─61353ab9-eefb-46e7-87a4-da100bd49d53
 # ╟─9607249e-6e65-4c4b-8d3f-00a1767eeb81
 # ╠═8b31063c-2246-11ec-03b9-61538108208f
 # ╠═71da984a-82b4-4ec4-902e-0c1ed7a47f05
@@ -1170,11 +1422,32 @@ version = "0.9.1+5"
 # ╠═69417ab5-d9d6-4b42-8e10-7a1a52e684ae
 # ╠═4feb2633-e8c8-4749-ba0f-82446f274a68
 # ╠═e0968057-8310-4d48-aa72-3a1bf2399f5d
+# ╟─19d918cc-b1d3-4058-8386-e1288fac8290
 # ╠═2faf437b-cbca-482a-b27e-eab22594f392
 # ╠═096a37b3-d8a0-4910-9906-4b52c3b430e8
-# ╠═0f08e144-af53-48c8-bf79-f1bb73b7505e
+# ╟─0f08e144-af53-48c8-bf79-f1bb73b7505e
 # ╠═041acb21-230f-4f52-b100-bcb41fcace75
-# ╠═9fbd24fb-734f-46ce-9054-9d91f41c3771
+# ╟─9fbd24fb-734f-46ce-9054-9d91f41c3771
+# ╟─64e48ba7-0a94-4958-a290-8852b118c1a2
+# ╠═c0073c0b-b582-4740-b392-864058509ef0
+# ╠═2986b6f9-c4d4-4a25-aa42-224be0ba511a
+# ╟─afdd6b30-a443-480c-8dbc-d9b2cbc428f0
+# ╟─fb5f69e0-5e71-4e86-89dd-617e32892192
+# ╠═3e2c91cd-23b2-478f-815c-86821d2ccb8d
+# ╟─194eba3b-a6c5-4207-8ba9-21b1aed0d47e
+# ╟─959d54eb-ea04-4380-8b4e-ec04da1c4ddb
+# ╟─45680b4d-6201-4d0f-be67-b122923d1820
+# ╠═95b61cf9-b993-4b05-90c7-3e1ccf2c25e5
+# ╠═d5e14cec-04e4-4513-8a1f-9c0fd086ab9d
+# ╟─7b0cbbf2-6b17-4cad-a1b7-41703463a48d
+# ╟─1681aacb-4f0f-449c-999c-9d57fcf19472
+# ╟─267d7b8c-da35-426e-ad06-e9d8819f2728
+# ╟─3bb7548b-d497-4263-80f3-f7c435647d87
+# ╟─791b5707-cc1e-4892-a761-f9680bc15cec
+# ╠═645bcb94-4d64-4006-8532-55e5aaa01ad5
+# ╠═f71d4aea-f51a-406b-8f5c-85a5aa1a8949
+# ╠═a24f058f-92ff-490c-80a6-7f3e7d98184d
+# ╠═13702d28-557f-4465-9e6f-37ce2779272c
 # ╟─3a18cc87-1508-483e-9c2d-fa579e7edab4
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
