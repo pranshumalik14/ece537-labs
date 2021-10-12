@@ -42,7 +42,7 @@ md"
 
 We define a custom continuous probability distribution $\texttt{ZDist}(a, b, c)$ with the following cumulative density function (cdf):
 
-$F_{\texttt{Z}}(z) = 
+$F_{Z}(z) = 
 \begin{cases} 
 	0, & z \lt a\\
 	\frac{z-a}{2(b-a)}, & a \leq z \lt b\\
@@ -50,7 +50,7 @@ $F_{\texttt{Z}}(z) =
 	1, & z \geq c
 \end{cases}$
 
-which has mean, $\text{E}[\texttt{Z}] = \frac{a + 2b + c}{4}$, and variance, $\text{VAR}[\texttt{Z}] = \frac{4b(b-a-c)+5a^2+5c^2-6ac}{48}$.
+which has mean, $\text{E}[Z] = \frac{a + 2b + c}{4}$, and variance, $\text{VAR}[Z] = \frac{4b(b-a-c)+5a^2+5c^2-6ac}{48}$.
 
 We will proceed with defining this distibution in code as a sampleable object (distribution `struct`).
 
@@ -87,7 +87,7 @@ md"
 
 Now that we have defined such a distribution in code, we need to make sure that the sampling algorithm matches the probability distribution function (pdf), which is:
 
-$f_{\texttt{Z}}(z) =
+$f_{Z}(z) =
 \begin{cases}	
 	0, & z \lt a\\
 	\frac{1}{2(b-a)}, & a \leq z \lt b\\
@@ -98,7 +98,7 @@ $f_{\texttt{Z}}(z) =
 
 Notice that this pdf is made up of two uniform pdfs with equal cumulative probability (of half). Therefore, given $U \sim \mathcal{U}(0,1)$ and $\widetilde{U} \sim \mathcal{U}(\{0,1\})$ our sampling algorithm is the following transformation:
 
-$\texttt{Z} = (1 - \widetilde{U})\cdot(a + (b-a)\cdot U) + \widetilde{U}\cdot(b + (c-b)\cdot U),$ 
+$Z = (1 - \widetilde{U})\cdot(a + (b-a)\cdot U) + \widetilde{U}\cdot(b + (c-b)\cdot U),$ 
 
 where $\widetilde{U}$ acts as a uniform \"selector\" across the two \"pieces\" in the distribution function.
 
@@ -242,9 +242,14 @@ md"
 
 ## 2. Independence of Discrete Random Variables
 
-In this section we describe a [categorical distribution](https://en.wikipedia.org/wiki/Categorical_distribution) pmf (uses the [Alias method](https://en.wikipedia.org/wiki/Alias_method) under the hood).
+In this section we describe a [categorical distribution](https://en.wikipedia.org/wiki/Categorical_distribution) for a biased dice. The probablity mass function (pmf) sampler uses the [alias method](https://en.wikipedia.org/wiki/Alias_method) under the hood, which we will be leveraging.
 
-First, we can start with defining the probablity vector, $p$, with $k = 6$ categories/bins.
+The biased dice has a pmf as follows:
+
+$P(X=1) = P(X=2) = 0.25$
+$P(X=3) = P(X=4) = P(X=5) = P(X=6) = 0.125.$
+
+We can represent such a categorical pmf as a vector of bin/category probabilities, $p$, which has size $k=6$ for 6 bins.
 
 "
 
@@ -254,7 +259,7 @@ p = [0.25, 0.25, 0.125, 0.125, 0.125, 0.125];
 # ╔═╡ 194eba3b-a6c5-4207-8ba9-21b1aed0d47e
 md"
 
-Talk about or introduce the variables X, Y, Z1, Z2 and introduce the task.
+Here we are interested in generating a joint pmf for a sequence of 2 dice throws $(X, Y)$ where both $X, Y \sim \text{Categorical}(p)$. We then define the random variables $Z_1 = X + Y$ and $Z_2 = X - Y$ for which we would also like to analyze the joint pmf. In both joint cases, we want to test for independence of the random variables, which we will do by testing joint pmf factorization, implications from conditional probability, and as well as some analytical proofs.
 
 "
 
@@ -262,6 +267,8 @@ Talk about or introduce the variables X, Y, Z1, Z2 and introduce the task.
 md"
 
 ### 2.1 Numerical Simulation
+
+We can now sample the distribution to get an idea of the joint pmfs $p_{X,Y}(x,y)$ and $p_{Z_1,Z_2}(z_1,z_2)$.
 
 𝑁₂ = $(@bind N₂ Slider(50:50:1500; show_value=true, default=500))
 
@@ -289,7 +296,7 @@ end
 # ╔═╡ 7b0cbbf2-6b17-4cad-a1b7-41703463a48d
 md"
 
-The empiricial joint pmf is given below.
+The empiricial joint pmf for $X$ and $Y$ is given below:
 
 "
 
@@ -305,7 +312,8 @@ end
 
 # ╔═╡ d8f74254-1501-485e-8313-cddfd0a69e61
 md"
-Define Z1 Z2.
+
+We now define $Z_1$ and $Z_2$ in code from the $(X,Y)$ samples already generated. The empiricial joint pmf for $Z_1$ and $Z_2$ is also given below.
 
 "
 
@@ -339,7 +347,7 @@ end
 # ╔═╡ 957c4115-b763-4ec2-977e-99152cdb1e92
 md"
 
-Z1 and Z2 are hihgly correlated. Knowing Z1 gives information about the range of Z2 and vice-versa.
+We can already observe here that $Z_1$ and $Z_2$ are correlated; knowing $Z_1$ gives some information about the range of $Z_2$ and vice-versa.
 
 "
 
@@ -348,8 +356,10 @@ md"
 
 ### 2.2 Summary of Results
 
-Note on how to calculate empiracal pmfs and then how to test for independence. Testing for N, defined above.
-Here is a table. The empirical pmf for X and Y, $p_{X, Y}(x,y)$, is:
+Here we will empirically test for the independence of joint random variables $(X, Y)$ and $(Z_1, Z_2)$. The simulated probabilities is for $N=100$ samples (defined in section 1.2).
+
+
+For those fixed $N$ samples, the joint empirical pmf $p_{X, Y}(x,y)$ is shown below, with $X$ along the rows and $Y$ along the columns:
 
 "
 
@@ -366,6 +376,13 @@ begin
 	DataFrame(𝑋𝑌fixedpmf, ["1", "2", "3", "4", "5", "6"])
 end
 
+# ╔═╡ 9de503b1-83dc-4b19-a33b-c0d28553e6ef
+md"
+
+The marginal pmf, $p_X(k)$, is calculated and displayed below:
+
+"
+
 # ╔═╡ 5ebb82a6-f3db-4aae-ada4-4dd48e5e97a5
 begin
 	#initialize
@@ -378,6 +395,13 @@ begin
 	
 	DataFrame(𝑋fixedmarginal, ["pₓ(k)"])
 end
+
+# ╔═╡ 9d4cfb5b-dccc-4473-be82-f291a8e9afde
+md"
+
+The marginal pmf, $p_Y(k)$, is calculated and displayed below:
+
+"
 
 # ╔═╡ 11c202f6-7b6c-4174-85af-39e81dabf845
 begin
@@ -396,7 +420,7 @@ end
 # ╔═╡ 1afed4d4-1845-4869-a820-ba8548d62918
 md"
 
-Now, to check for independence, we can subtract the two matrices to see relative error. In essence, we can do: $W - XY^\intercal$, where $W$ is the XYfixedpmf matrix.
+Now, to check for independence, we know will use the information that the joint pmf factors into respective marginal pmfs. We will subtract the two matrices, one with the empirical joint pmf $p_{X,Y}(x,y)$ and the other with the factored products of marginal pmfs $p_X(x)p_Y(y)$, to see absolute elementwise error. The factored product pmf was obtained by $\mathbf{p}_X(x)\mathbf{p}_Y(y)^\intercal$.
 
 "
 
@@ -409,9 +433,9 @@ end
 # ╔═╡ 010f3e24-52e0-4e18-9403-1f5786a56742
 md"
 
-We can see that the errors are quite small. Indeed indep. This could have also been verified alternatively using the correlation matrix.
+We can observe that the errors are quite smal and despite a small sample size, $X$ and $Y$ do look indpendent. This will again be verified alternatively using conditional probablility later on.
 
-Now, similarly, we will numerically test for the independence of $Z_1$ and $Z_2$.
+Now, similarly, we will numerically test for the independence of $Z_1$ and $Z_2$. The joint empirical pmf $p_{Z_1, Z_2}(z_1, z_2)$ is shown below, with $Z_1$ along the rows and $Z_2$ along the columns:
 
 "
 
@@ -432,6 +456,13 @@ begin
 		["-5", "-4", "-3", "-2", "-1", "0", "1", "2", "3", "4", "5"])
 end
 
+# ╔═╡ f88cc5c9-090c-42b5-b6a3-4bf421c6f9c3
+md"
+
+The marginal pmf, $p_{Z_1}(k)$, is calculated and displayed below:
+
+"
+
 # ╔═╡ 13702d28-557f-4465-9e6f-37ce2779272c
 begin
 	#initialize
@@ -444,6 +475,13 @@ begin
 	
 	DataFrame(𝑍₁fixedmarginal, ["pz₁(k)"])
 end
+
+# ╔═╡ cd3a98ff-3d97-442b-a00e-ecff7df23d9d
+md"
+
+The marginal pmf, $p_{Z_2}(k)$, is calculated and displayed below (with shifted indices):
+
+"
 
 # ╔═╡ 94d8b859-d2d9-4bea-a83f-40beafa066ab
 begin
@@ -458,6 +496,13 @@ begin
 	DataFrame(𝑍₂fixedmarginal, ["pz₂(k+6)"])
 end
 
+# ╔═╡ 28ac4d78-b7fc-42b8-830b-78d36149db43
+md"
+
+Similar to what was done before for $X$ and $Y$ for checking independence, we will subtract the two matrices, one with the empirical joint pmf $p_{Z_1,Z_2}(z_1,z_2)$ and the other with the factored products of marginal pmfs $p_{Z_1}(z_1)p_{Z_2}(z_2)$, to see absolute elementwise error.
+
+"
+
 # ╔═╡ ac225d0a-ec74-4ec7-95d8-25e4b161d940
 begin
 	𝑍₁𝑍₂pmferror = 𝑍₁𝑍₂fixedpmf .- (𝑍₁fixedmarginal*transpose(𝑍₂fixedmarginal)) .|> abs
@@ -466,22 +511,42 @@ begin
 end
 
 # ╔═╡ 2f6d0d58-a269-4a2a-b179-8d1acd84fa76
-# p(2,6) is the most effected, can talk about that.
+md"
+
+Here we can see that the absolute error is mostly present at a higher magintude and for almost all entries than in the case for $(X, Y)$. But still, it may not directly convey the independence as strongly.
+
+Therefore, an easier test to demonstrate dependence of the random variables $(Z_1, Z_2)$ can be using conditional probablity. Specifically, we can check if the posterior probabilities are much different than the prior probabilities which would imply dependence. More formally, we want to check if,
+
+$P(Z_2=z \mid Z_1=k) = \frac{p_{Z_1,Z_2}(k, z)}{p_{Z_1}(k)} \stackrel{?}{=} p_{Z_2}(z)$
+
+
+"
 
 # ╔═╡ 2141a8d4-baa5-46d8-8cd7-1a4f41560245
 md"
 
-An easier test can be using conditional probablity. More specifically,
-
-$P(X=x_0 \mid Y=k) = \frac{p_{X,Y}(x_0, k)}{P(Y=k)} \stackrel{?}{=} P(X=x_0)$
+We can consider the case where we are given $Z_1 = 2$ and we check for the probability of having $Z_2 = 0$. As can be seen from the graph, the probability for this will always be $1$ since that is the only possible value for $Z_2$ because both $X$ and $Y$ will have to be equal to $1$. But this would not equal the marginal probability of observing $Z_2 = 0$. We can check the disparity through code as well:
 
 "
 
 # ╔═╡ 02426fae-d44c-45e9-8f98-aa4b6443faca
-p𝑍₁_given_𝑍₂ = 𝑍₁𝑍₂fixedpmf[2,0+6]/𝑍₂fixedmarginal[0+6]
+p𝑍₂_given_𝑍₁ = 𝑍₁𝑍₂fixedpmf[2,0+6]/𝑍₁fixedmarginal[2]
 
 # ╔═╡ 9eb66a79-9cc7-491d-ab8d-196935c1f3ff
-p𝑍₁ = 𝑍₁fixedmarginal[2]
+p𝑍₂ = 𝑍₂fixedmarginal[0+6]
+
+# ╔═╡ 42a09daf-a061-481f-bba9-33defb09e716
+md"
+
+Additionally, we can also _**prove**_ the dependence of $Z_1$ and $Z_2$ by the following argument: if $Z_1$ is even, then $Z_2$ has to be even as well, i.e. $P(Z_2 = \text{ odd} \mid Z_1 = \text{ even}) = 0$, and this follows for the flipped case too.
+
+This can be shown by a simple contradiction. If $Z_1 = X + Y =  2k, k \in \mathbb{N}$, and we assume $Z_2 = X - Y = 2m +1, m \in \mathbb{N}$, then $Z_1 + Z_2 = 2X = 2k + 2m + 1$ which is odd, and does not match the left hand side which will always be even. Hence we arrive at a contradiction and can conslude that if either of $Z_1$ or $Z_2$ is even, then the other variable will also be even. The same goes for when either $Z_1$ or $Z_2$ are odd, enforcing both variables to be odd. This pattern is also evident in the joint pmf plot and table.
+
+Here, we can notice that even though the probablity for disparity in the eveness or oddness of $Z_1$ and $Z_2$ is provably $0$, the product of marginals will never reflect this.
+
+On the other hand, we see no such dependence for $X$ and $Y$, and the posterior and prior probabilities indeed converge in the conditional case as well, espectially for higher number of samples. For $N=100$, this can be tested below by moving the sliders.
+
+"
 
 # ╔═╡ 5e56ab15-1ed4-4893-9c0a-7bedc31aacca
 md"
@@ -498,11 +563,19 @@ p𝑋_given_𝑌 = 𝑋𝑌fixedpmf[x, y]/𝑌fixedmarginal[y]
 # ╔═╡ 8758ec68-4c45-4017-be59-c70118b0d793
 p𝑋 = 𝑋fixedmarginal[x]
 
+# ╔═╡ c2482400-c263-4285-a646-cd7a58c55695
+md"
+
+Therefore, we can conclude that $(X,Y)$ are independent while $(Z_1, Z_2)$ are dependent random variables.
+
+"
+
 # ╔═╡ 3a18cc87-1508-483e-9c2d-fa579e7edab4
 md"
 
 ## 3. Code
-Note that all code for this lab can be run on the cloud and viewed as is at the github repository hosted page [here](https://pranshumalik14.github.io/ece537-labs/lab1/lab1.jl.html).
+
+Note that this lab report can be run on the cloud and viewed as is on the github repository page [here](https://pranshumalik14.github.io/ece537-labs/lab1/lab1.jl.html). All code for the notebook can be accessed [here](https://github.com/pranshumalik14/ece537-labs).
 
 "
 
@@ -1651,37 +1724,44 @@ version = "0.9.1+5"
 # ╟─103cb58f-0a5d-4d23-8ed8-1a1787f55df0
 # ╟─f576da02-3ea8-452b-a985-6926f7343d1a
 # ╟─29e55bef-c7ac-4f18-a127-1df9954ab7f6
-# ╠═fb5f69e0-5e71-4e86-89dd-617e32892192
+# ╟─fb5f69e0-5e71-4e86-89dd-617e32892192
 # ╠═3e2c91cd-23b2-478f-815c-86821d2ccb8d
 # ╟─194eba3b-a6c5-4207-8ba9-21b1aed0d47e
-# ╠═959d54eb-ea04-4380-8b4e-ec04da1c4ddb
+# ╟─959d54eb-ea04-4380-8b4e-ec04da1c4ddb
 # ╟─45680b4d-6201-4d0f-be67-b122923d1820
 # ╠═95b61cf9-b993-4b05-90c7-3e1ccf2c25e5
 # ╟─7b0cbbf2-6b17-4cad-a1b7-41703463a48d
 # ╟─1681aacb-4f0f-449c-999c-9d57fcf19472
-# ╠═d8f74254-1501-485e-8313-cddfd0a69e61
+# ╟─d8f74254-1501-485e-8313-cddfd0a69e61
 # ╠═d5e14cec-04e4-4513-8a1f-9c0fd086ab9d
 # ╟─267d7b8c-da35-426e-ad06-e9d8819f2728
 # ╟─3bb7548b-d497-4263-80f3-f7c435647d87
 # ╟─957c4115-b763-4ec2-977e-99152cdb1e92
-# ╠═791b5707-cc1e-4892-a761-f9680bc15cec
+# ╟─791b5707-cc1e-4892-a761-f9680bc15cec
 # ╠═645bcb94-4d64-4006-8532-55e5aaa01ad5
+# ╟─9de503b1-83dc-4b19-a33b-c0d28553e6ef
 # ╠═5ebb82a6-f3db-4aae-ada4-4dd48e5e97a5
+# ╟─9d4cfb5b-dccc-4473-be82-f291a8e9afde
 # ╠═11c202f6-7b6c-4174-85af-39e81dabf845
 # ╟─1afed4d4-1845-4869-a820-ba8548d62918
 # ╠═a105a25b-d539-46a9-8564-155b450a5768
 # ╟─010f3e24-52e0-4e18-9403-1f5786a56742
 # ╠═a24f058f-92ff-490c-80a6-7f3e7d98184d
+# ╟─f88cc5c9-090c-42b5-b6a3-4bf421c6f9c3
 # ╠═13702d28-557f-4465-9e6f-37ce2779272c
+# ╟─cd3a98ff-3d97-442b-a00e-ecff7df23d9d
 # ╠═94d8b859-d2d9-4bea-a83f-40beafa066ab
+# ╟─28ac4d78-b7fc-42b8-830b-78d36149db43
 # ╠═ac225d0a-ec74-4ec7-95d8-25e4b161d940
-# ╠═2f6d0d58-a269-4a2a-b179-8d1acd84fa76
+# ╟─2f6d0d58-a269-4a2a-b179-8d1acd84fa76
 # ╟─2141a8d4-baa5-46d8-8cd7-1a4f41560245
 # ╠═02426fae-d44c-45e9-8f98-aa4b6443faca
 # ╠═9eb66a79-9cc7-491d-ab8d-196935c1f3ff
+# ╟─42a09daf-a061-481f-bba9-33defb09e716
 # ╟─5e56ab15-1ed4-4893-9c0a-7bedc31aacca
 # ╠═04968bf9-ca1c-4c63-bf2b-2449f352a6bc
 # ╠═8758ec68-4c45-4017-be59-c70118b0d793
+# ╟─c2482400-c263-4285-a646-cd7a58c55695
 # ╟─3a18cc87-1508-483e-9c2d-fa579e7edab4
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
