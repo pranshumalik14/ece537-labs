@@ -23,8 +23,9 @@ PlutoUI.TableOfContents()
 md"
 
 # ECE537: Lab 1 Report
+> _It is recommended to access this report by opening the `html` file on the browser or by clicking [here](https://pranshumalik14.github.io/ece537-labs/lab1/lab1.jl.html)_.
 
-In this lab, we are supposed to create distributions, sample, and test for independence of RVs.
+In this lab, we are supposed to create custom univariate and joint distributions, sample from these distributions to test for convergence cirtieria, and also test for independence of random variables. In the first part, we will be creating a continuous random variable, and in the second part we will be creating discrete independent and joint random variables. Throughout this lab, the [Distributions.jl](https://github.com/JuliaStats/Distributions.jl) package in Julia has been utilized to be able to use the probabllity constructs in code.
 
 "
 
@@ -39,24 +40,19 @@ md"
 
 ## 1. Simulating Univariate Random Variables
 
-We define an R.V. $Z$ with cdf 
+We define a custom continuous probability distribution $\texttt{ZDist}(a, b, c)$ with the following cumulative density function (cdf):
 
-$F_Z(z) = 
+$F_{\texttt{Z}}(z) = 
 \begin{cases} 
 	0, & z \lt a\\
 	\frac{z-a}{2(b-a)}, & a \leq z \lt b\\
 	\frac{1}{2} + \frac{z-b}{2(c-b)}, & b \leq z \lt c\\
 	1, & z \geq c
-\end{cases}$ 
+\end{cases}$
 
-which has mean, $\text{E}[Z] = xyz$, and variance, $\text{VAR}[Z] = zyx$.
+which has mean, $\text{E}[\texttt{Z}] = \frac{a + 2b + c}{4}$, and variance, $\text{VAR}[\texttt{Z}] = \frac{4b(b-a-c)+5a^2+5c^2-6ac}{48}$.
 
-"
-
-# ╔═╡ b744a3e5-ff62-4032-b511-9fbf6c3e1806
-md"
-
-Now, in order to define this R.V. we can define a distribution with the given cdf using the Distributions.jl package. 
+We will proceed with defining this distibution in code as a sampleable object (distribution `struct`).
 
 "
 
@@ -79,18 +75,51 @@ end
 
 # ╔═╡ 69417ab5-d9d6-4b42-8e10-7a1a52e684ae
 begin
+	# helper functions
 	@distr_support ZDist d.a d.c
 	params(d::ZDist) = (d.a, d.b, d.c)
+	mean(d::ZDist) = (d.a + 2d.b + d.c)/4
+	var(d::ZDist) = (4d.b*(d.b - d.a - d.c) + 5d.a^2 + 5d.c^2 - 6d.a*d.c)/48
 end
+
+# ╔═╡ f89bd965-954a-4675-8cf4-39fcf96d53c4
+md"
+
+Now that we have defined such a distribution in code, we need to make sure that the sampling algorithm matches the probability distribution function (pdf), which is:
+
+$f_{\texttt{Z}}(z) =
+\begin{cases}	
+	0, & z \lt a\\
+	\frac{1}{2(b-a)}, & a \leq z \lt b\\
+	\frac{1}{2(c-b)}, & b \leq z \lt c\\
+	0, & z \gt c
+\end{cases}$
+
+
+Notice that this pdf is made up of two uniform pdfs with equal cumulative probability (of half). Therefore, given $U \sim \mathcal{U}(0,1)$ and $\widetilde{U} \sim \mathcal{U}(\{0,1\})$ our sampling algorithm is the following transformation:
+
+$\texttt{Z} = (1 - \widetilde{U})\cdot(a + (b-a)\cdot U) + \widetilde{U}\cdot(b + (c-b)\cdot U),$ 
+
+where $\widetilde{U}$ acts as a uniform \"selector\" across the two \"pieces\" in the distribution function.
+
+"
 
 # ╔═╡ 4feb2633-e8c8-4749-ba0f-82446f274a68
 function Base.rand(rng::AbstractRNG, d::ZDist)
     (a, b, c) = params(d)
-	u = rand(0:1)
-    u₁ = a + (b - a) * rand(rng)
-	u₂ = b + (c - b) * rand(rng)
-    return (1-u) * u₁ + u * u₂
+	u = rand(rng)
+	ũ = rand(0:1)
+    u₁ = a + (b - a) * u
+	u₂ = b + (c - b) * u
+    return (1-ũ) * u₁ + ũ * u₂
 end
+
+# ╔═╡ 1bb1faa6-8eb4-45f5-a203-75747a0dbfd8
+md"
+
+In this lab, we will consider the random variable $Z \sim \texttt{ZDist}(0, 1, 3)$.
+
+"
 
 # ╔═╡ e0968057-8310-4d48-aa72-3a1bf2399f5d
 𝒵 = ZDist(0, 1, 3);
@@ -98,7 +127,10 @@ end
 # ╔═╡ 19d918cc-b1d3-4058-8386-e1288fac8290
 md"
 
-### 1.1 Testing simulation
+### 1.1 Numerical Simulation
+
+We can now sample the distribution many times and check for convergence of key statistics, like the mean and variance, empirically.
+
 𝑁₁ = $(@bind N₁ Slider(50:50:10000; show_value=true, default=3000))
 
 "
@@ -142,26 +174,68 @@ begin
 	title!("Empirical pdf")
 end
 
-# ╔═╡ 03170733-aa4e-4f6f-ae42-2eb3e8b81b15
-# equations for mean and corrected variance.
+# ╔═╡ 784f20f7-011f-464f-a173-2d22f42774b8
+𝒵mean_error = abs(StatsBase.mean(𝒵samples) - mean(𝒵))
 
-# ╔═╡ c0073c0b-b582-4740-b392-864058509ef0
-𝒵mean = sum(𝒵samples)/length(𝒵samples)
-
-# ╔═╡ 2986b6f9-c4d4-4a25-aa42-224be0ba511a
-𝒵var = var(𝒵samples)
+# ╔═╡ a4198c8f-71cd-4c1c-b9c6-45146f389ddc
+𝒵var_error = abs(StatsBase.var(𝒵samples) - var(𝒵))
 
 # ╔═╡ afdd6b30-a443-480c-8dbc-d9b2cbc428f0
 md"
 
 ### 1.2 Summary of Results
 
-Here is a table of results and graphs for means ans vars over sizes for particular runs.
+Here we will empirically test for convergence of key statistics of the $\texttt{ZDist}$ distribution. 
 
 "
 
 # ╔═╡ 3b3daf8e-4cd3-4d07-8adf-a506ee866df0
-# todo plots and plots with var given in dotted line
+N = 100; # fixed number of samples
+
+# ╔═╡ 12457e5e-007a-4c79-ab86-a314ae36952f
+𝒵fixedsamples = rand(𝒵, N);
+
+# ╔═╡ 1b987d73-5690-4912-a1f5-e0aa1a7f6107
+md"
+
+We can compare the empirical mean and variance with the true mean and variance for the fixed number of samples above, and notice that they are indeed very close even for a few samples (in the context of statistical significance).
+
+"
+
+# ╔═╡ 51851c77-57bb-4b21-bcfa-7b624834aa82
+𝒵fixedmean_error = abs(StatsBase.mean(𝒵fixedsamples) - mean(𝒵))
+
+# ╔═╡ f494377c-b862-4f91-9801-13f04e487b48
+𝒵fixedvar_error = abs(StatsBase.var(𝒵fixedsamples) - var(𝒵))
+
+# ╔═╡ 103cb58f-0a5d-4d23-8ed8-1a1787f55df0
+md"
+
+For testing convergence, we can sample across a wide range of sizes to get an idea of the trend. Below, we sample the $Z(0,1,3)$ distribution $N = [100, 200, 300, 400, 500, 1000, 2000, 5000]$ times.
+
+"
+
+# ╔═╡ f576da02-3ea8-452b-a985-6926f7343d1a
+let
+	N = [100, 200, 300, 400, 500, 1000, 2000, 5000]
+	
+	𝒵samplesets = [rand(𝒵, n) for n ∈ N]
+	𝒵means      = [StatsBase.mean(𝒵s) for 𝒵s ∈ 𝒵samplesets]
+	𝒵vars       = [StatsBase.var(𝒵s) for 𝒵s ∈ 𝒵samplesets]
+	
+	plot((n) -> mean(𝒵), 1:100:5000; line=:dash, linewidth=3, label="true mean")
+	plot!((n) -> var(𝒵), 1:100:5000; line=:dash, linewidth=3, label="true variance")
+	plot!(N, 𝒵means; marker=:circle, label="empirical mean")
+	plot!(N, 𝒵vars; marker=:circle, label="empirical variance")
+	plot!(; xlabel=L"N", ylabel="Statistic", title=L"Z_N(0, 1, 3)", legend=:right)
+end
+
+# ╔═╡ 29e55bef-c7ac-4f18-a127-1df9954ab7f6
+md"
+
+And, indeed, the statistics seem to converge quickly as the number of (independent) samples increase.
+
+"
 
 # ╔═╡ fb5f69e0-5e71-4e86-89dd-617e32892192
 md"
@@ -187,7 +261,8 @@ Talk about or introduce the variables X, Y, Z1, Z2 and introduce the task.
 # ╔═╡ 959d54eb-ea04-4380-8b4e-ec04da1c4ddb
 md"
 
-### 2.1 Testing sims
+### 2.1 Numerical Simulation
+
 𝑁₂ = $(@bind N₂ Slider(50:50:1500; show_value=true, default=500))
 
 "
@@ -204,19 +279,11 @@ end
 
 # ╔═╡ 95b61cf9-b993-4b05-90c7-3e1ccf2c25e5
 begin
-	𝑋  = Categorical(p);
-	𝑌  = Categorical(p);
-	𝑋𝑌 = Product([𝑋, 𝑌]);
+	𝑋  = Categorical(p);  # 𝑋 with pₓ(k) = p[k]
+	𝑌  = Categorical(p);  # 𝑌 with pᵧ(k) = p[k]
+	𝑋𝑌 = Product([𝑋, 𝑌]); # mixture model with two independent r.v.s 𝑋 and 𝑌
 	
 	𝑋𝑌samples = rand(𝑋𝑌, N₂) |> matrixtotuple
-end
-
-# ╔═╡ d5e14cec-04e4-4513-8a1f-9c0fd086ab9d
-begin
-	𝑍₁ = [xy[1] + xy[2] for xy in 𝑋𝑌samples] |> transpose
-	𝑍₂ = [xy[1] - xy[2] for xy in 𝑋𝑌samples] |> transpose
-	
-	𝑍₁𝑍₂samples = vcat(𝑍₁, 𝑍₂) |> matrixtotuple
 end
 
 # ╔═╡ 7b0cbbf2-6b17-4cad-a1b7-41703463a48d
@@ -234,6 +301,20 @@ begin
 	title!(L"p_{X,Y}(x,y)")
 	xlims!(0.5, 6.5)
 	ylims!(0.5, 6.5)
+end
+
+# ╔═╡ d8f74254-1501-485e-8313-cddfd0a69e61
+md"
+Define Z1 Z2.
+
+"
+
+# ╔═╡ d5e14cec-04e4-4513-8a1f-9c0fd086ab9d
+begin
+	𝑍₁ = [xy[1] + xy[2] for xy ∈ 𝑋𝑌samples] |> transpose
+	𝑍₂ = [xy[1] - xy[2] for xy ∈ 𝑋𝑌samples] |> transpose
+	
+	𝑍₁𝑍₂samples = vcat(𝑍₁, 𝑍₂) |> matrixtotuple
 end
 
 # ╔═╡ 267d7b8c-da35-426e-ad06-e9d8819f2728
@@ -267,13 +348,10 @@ md"
 
 ### 2.2 Summary of Results
 
-Note on how to calculate empiracal pmfs and then how to test for independence.
+Note on how to calculate empiracal pmfs and then how to test for independence. Testing for N, defined above.
 Here is a table. The empirical pmf for X and Y, $p_{X, Y}(x,y)$, is:
 
 "
-
-# ╔═╡ ba4a439d-ca4b-4153-923a-211e47fa04c7
-N = 100	# fixed number of samples
 
 # ╔═╡ 645bcb94-4d64-4006-8532-55e5aaa01ad5
 begin
@@ -387,9 +465,6 @@ begin
 		["-5", "-4", "-3", "-2", "-1", "0", "1", "2", "3", "4", "5"])
 end
 
-# ╔═╡ f3f7bc5f-f239-43a5-935b-7f3206b71b68
-# can also check solely over zero indices for consistent mismatches
-
 # ╔═╡ 2f6d0d58-a269-4a2a-b179-8d1acd84fa76
 # p(2,6) is the most effected, can talk about that.
 
@@ -403,13 +478,25 @@ $P(X=x_0 \mid Y=k) = \frac{p_{X,Y}(x_0, k)}{P(Y=k)} \stackrel{?}{=} P(X=x_0)$
 "
 
 # ╔═╡ 02426fae-d44c-45e9-8f98-aa4b6443faca
-begin
- 
-	𝑍₁𝑍₂fixedpmf[2,0+6]/𝑍₂fixedmarginal[0+6]
-end
+p𝑍₁_given_𝑍₂ = 𝑍₁𝑍₂fixedpmf[2,0+6]/𝑍₂fixedmarginal[0+6]
 
 # ╔═╡ 9eb66a79-9cc7-491d-ab8d-196935c1f3ff
-𝑍₁fixedmarginal[2]
+p𝑍₁ = 𝑍₁fixedmarginal[2]
+
+# ╔═╡ 5e56ab15-1ed4-4893-9c0a-7bedc31aacca
+md"
+
+x = $(@bind x Slider(1:1:6; show_value=true, default=3))
+
+y = $(@bind y Slider(1:1:6; show_value=true, default=3))
+
+"
+
+# ╔═╡ 04968bf9-ca1c-4c63-bf2b-2449f352a6bc
+p𝑋_given_𝑌 = 𝑋𝑌fixedpmf[x, y]/𝑌fixedmarginal[y]
+
+# ╔═╡ 8758ec68-4c45-4017-be59-c70118b0d793
+p𝑋 = 𝑋fixedmarginal[x]
 
 # ╔═╡ 3a18cc87-1508-483e-9c2d-fa579e7edab4
 md"
@@ -1540,10 +1627,11 @@ version = "0.9.1+5"
 # ╠═71da984a-82b4-4ec4-902e-0c1ed7a47f05
 # ╠═8f5ad170-0f11-4afd-bee3-32de54d4206a
 # ╟─0dff3c7e-af8e-4e72-baa3-9fd1a0f03a52
-# ╟─b744a3e5-ff62-4032-b511-9fbf6c3e1806
 # ╠═c9324b3e-ffd2-4ab9-b48c-d057e3e22e30
 # ╠═69417ab5-d9d6-4b42-8e10-7a1a52e684ae
+# ╟─f89bd965-954a-4675-8cf4-39fcf96d53c4
 # ╠═4feb2633-e8c8-4749-ba0f-82446f274a68
+# ╟─1bb1faa6-8eb4-45f5-a203-75747a0dbfd8
 # ╠═e0968057-8310-4d48-aa72-3a1bf2399f5d
 # ╟─19d918cc-b1d3-4058-8386-e1288fac8290
 # ╠═2faf437b-cbca-482a-b27e-eab22594f392
@@ -1552,25 +1640,31 @@ version = "0.9.1+5"
 # ╠═041acb21-230f-4f52-b100-bcb41fcace75
 # ╟─9fbd24fb-734f-46ce-9054-9d91f41c3771
 # ╟─64e48ba7-0a94-4958-a290-8852b118c1a2
-# ╠═03170733-aa4e-4f6f-ae42-2eb3e8b81b15
-# ╠═c0073c0b-b582-4740-b392-864058509ef0
-# ╠═2986b6f9-c4d4-4a25-aa42-224be0ba511a
+# ╠═784f20f7-011f-464f-a173-2d22f42774b8
+# ╠═a4198c8f-71cd-4c1c-b9c6-45146f389ddc
 # ╟─afdd6b30-a443-480c-8dbc-d9b2cbc428f0
 # ╠═3b3daf8e-4cd3-4d07-8adf-a506ee866df0
-# ╟─fb5f69e0-5e71-4e86-89dd-617e32892192
+# ╠═12457e5e-007a-4c79-ab86-a314ae36952f
+# ╟─1b987d73-5690-4912-a1f5-e0aa1a7f6107
+# ╠═51851c77-57bb-4b21-bcfa-7b624834aa82
+# ╠═f494377c-b862-4f91-9801-13f04e487b48
+# ╟─103cb58f-0a5d-4d23-8ed8-1a1787f55df0
+# ╟─f576da02-3ea8-452b-a985-6926f7343d1a
+# ╟─29e55bef-c7ac-4f18-a127-1df9954ab7f6
+# ╠═fb5f69e0-5e71-4e86-89dd-617e32892192
 # ╠═3e2c91cd-23b2-478f-815c-86821d2ccb8d
 # ╟─194eba3b-a6c5-4207-8ba9-21b1aed0d47e
-# ╟─959d54eb-ea04-4380-8b4e-ec04da1c4ddb
+# ╠═959d54eb-ea04-4380-8b4e-ec04da1c4ddb
 # ╟─45680b4d-6201-4d0f-be67-b122923d1820
 # ╠═95b61cf9-b993-4b05-90c7-3e1ccf2c25e5
-# ╠═d5e14cec-04e4-4513-8a1f-9c0fd086ab9d
 # ╟─7b0cbbf2-6b17-4cad-a1b7-41703463a48d
 # ╟─1681aacb-4f0f-449c-999c-9d57fcf19472
+# ╠═d8f74254-1501-485e-8313-cddfd0a69e61
+# ╠═d5e14cec-04e4-4513-8a1f-9c0fd086ab9d
 # ╟─267d7b8c-da35-426e-ad06-e9d8819f2728
 # ╟─3bb7548b-d497-4263-80f3-f7c435647d87
 # ╟─957c4115-b763-4ec2-977e-99152cdb1e92
-# ╟─791b5707-cc1e-4892-a761-f9680bc15cec
-# ╠═ba4a439d-ca4b-4153-923a-211e47fa04c7
+# ╠═791b5707-cc1e-4892-a761-f9680bc15cec
 # ╠═645bcb94-4d64-4006-8532-55e5aaa01ad5
 # ╠═5ebb82a6-f3db-4aae-ada4-4dd48e5e97a5
 # ╠═11c202f6-7b6c-4174-85af-39e81dabf845
@@ -1581,11 +1675,13 @@ version = "0.9.1+5"
 # ╠═13702d28-557f-4465-9e6f-37ce2779272c
 # ╠═94d8b859-d2d9-4bea-a83f-40beafa066ab
 # ╠═ac225d0a-ec74-4ec7-95d8-25e4b161d940
-# ╠═f3f7bc5f-f239-43a5-935b-7f3206b71b68
 # ╠═2f6d0d58-a269-4a2a-b179-8d1acd84fa76
 # ╟─2141a8d4-baa5-46d8-8cd7-1a4f41560245
 # ╠═02426fae-d44c-45e9-8f98-aa4b6443faca
 # ╠═9eb66a79-9cc7-491d-ab8d-196935c1f3ff
+# ╟─5e56ab15-1ed4-4893-9c0a-7bedc31aacca
+# ╠═04968bf9-ca1c-4c63-bf2b-2449f352a6bc
+# ╠═8758ec68-4c45-4017-be59-c70118b0d793
 # ╟─3a18cc87-1508-483e-9c2d-fa579e7edab4
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
