@@ -49,7 +49,7 @@ $F_Z(z) =
 	1, & z \geq c
 \end{cases}$ 
 
-which has mean, $E[Z] = xyz$, and variance, $\text{VAR}[Z] = zyx$.
+which has mean, $\text{E}[Z] = xyz$, and variance, $\text{VAR}[Z] = zyx$.
 
 "
 
@@ -142,6 +142,9 @@ begin
 	title!("Empirical pdf")
 end
 
+# ╔═╡ 03170733-aa4e-4f6f-ae42-2eb3e8b81b15
+# equations for mean and corrected variance.
+
 # ╔═╡ c0073c0b-b582-4740-b392-864058509ef0
 𝒵mean = sum(𝒵samples)/length(𝒵samples)
 
@@ -156,6 +159,9 @@ md"
 Here is a table of results and graphs for means ans vars over sizes for particular runs.
 
 "
+
+# ╔═╡ 3b3daf8e-4cd3-4d07-8adf-a506ee866df0
+# todo plots and plots with var given in dotted line
 
 # ╔═╡ fb5f69e0-5e71-4e86-89dd-617e32892192
 md"
@@ -182,7 +188,7 @@ Talk about or introduce the variables X, Y, Z1, Z2 and introduce the task.
 md"
 
 ### 2.1 Testing sims
-𝑁₂ = $(@bind N₂ Slider(50:50:2500; show_value=true, default=500))
+𝑁₂ = $(@bind N₂ Slider(50:50:1500; show_value=true, default=500))
 
 "
 
@@ -249,6 +255,13 @@ begin
 	yticks!(-5:1:5)
 end
 
+# ╔═╡ 957c4115-b763-4ec2-977e-99152cdb1e92
+md"
+
+Z1 and Z2 are hihgly correlated. Knowing Z1 gives information about the range of Z2 and vice-versa.
+
+"
+
 # ╔═╡ 791b5707-cc1e-4892-a761-f9680bc15cec
 md"
 
@@ -259,34 +272,144 @@ Here is a table. The empirical pmf for X and Y, $p_{X, Y}(x,y)$, is:
 
 "
 
+# ╔═╡ ba4a439d-ca4b-4153-923a-211e47fa04c7
+N = 100	# fixed number of samples
+
 # ╔═╡ 645bcb94-4d64-4006-8532-55e5aaa01ad5
 begin
-	N = 100 # fixed number of samples
 	𝑋𝑌fixedsamples = rand(𝑋𝑌, N) |> matrixtotuple
 	
-	𝑋𝑌fixedpmf = zeros(6,6)
+	𝑋𝑌fixedpmf = zeros(6,6) # initialize
+	for (x, y) ∈ 𝑋𝑌fixedsamples
+		𝑋𝑌fixedpmf[x, y] += 1
+	end
+	𝑋𝑌fixedpmf ./= N 		  # normalize
+		
 	DataFrame(𝑋𝑌fixedpmf, ["1", "2", "3", "4", "5", "6"])
 end
 
-# ╔═╡ f71d4aea-f51a-406b-8f5c-85a5aa1a8949
-# marginal pmfs for X and Y
+# ╔═╡ 5ebb82a6-f3db-4aae-ada4-4dd48e5e97a5
+begin
+	#initialize
+	𝑋range = size(𝑋𝑌fixedpmf, 1)
+	𝑋fixedmarginal = zeros(𝑋range, 1)
+	
+	for k ∈ 1:𝑋range
+		𝑋fixedmarginal[k] = sum(𝑋𝑌fixedpmf[k, :]) # Σₖp(𝑌=k|𝑋)
+	end
+	
+	DataFrame(𝑋fixedmarginal, ["pₓ(k)"])
+end
+
+# ╔═╡ 11c202f6-7b6c-4174-85af-39e81dabf845
+begin
+	#initialize
+	𝑌range = size(𝑋𝑌fixedpmf, 2)
+	𝑌fixedmarginal = zeros(𝑌range, 1)
+	
+	# marginalize
+	for k ∈ 1:𝑌range
+		𝑌fixedmarginal[k] = sum(𝑋𝑌fixedpmf[:, k]) # Σₖp(𝑋=k|𝑌)
+	end
+	
+	DataFrame(𝑌fixedmarginal, ["Pᵧ(k)"])
+end
+
+# ╔═╡ 1afed4d4-1845-4869-a820-ba8548d62918
+md"
+
+Now, to check for independence, we can subtract the two matrices to see relative error. In essence, we can do: $W - XY^\intercal$, where $W$ is the XYfixedpmf matrix.
+
+"
+
+# ╔═╡ a105a25b-d539-46a9-8564-155b450a5768
+begin
+	𝑋𝑌pmferror = 𝑋𝑌fixedpmf .- (𝑋fixedmarginal * transpose(𝑌fixedmarginal)) .|> abs
+	DataFrame(𝑋𝑌pmferror, ["1", "2", "3", "4", "5", "6"])
+end
+
+# ╔═╡ 010f3e24-52e0-4e18-9403-1f5786a56742
+md"
+
+We can see that the errors are quite small. Indeed indep. This could have also been verified alternatively using the correlation matrix.
+
+Now, similarly, we will numerically test for the independence of $Z_1$ and $Z_2$.
+
+"
 
 # ╔═╡ a24f058f-92ff-490c-80a6-7f3e7d98184d
 begin
-	𝑍₁fixed        = [xy[1] + xy[2] for xy in 𝑋𝑌fixedsamples] |> transpose
-	𝑍₂fixed        = [xy[1] - xy[2] for xy in 𝑋𝑌fixedsamples] |> transpose
+	𝑍₁fixed = [xy[1] + xy[2] for xy in 𝑋𝑌fixedsamples] |> transpose
+	𝑍₂fixed = [xy[1] - xy[2] for xy in 𝑋𝑌fixedsamples] |> transpose
 	
 	𝑍₁𝑍₂fixedsamples = vcat(𝑍₁fixed, 𝑍₂fixed) |> matrixtotuple
 	
-	𝑍₂𝑍₁fixedpmf = zeros(12, 11)
-	# loop
+	𝑍₁𝑍₂fixedpmf = zeros(12, 11) 		# initialize
+	for (z1, z2) ∈ 𝑍₁𝑍₂fixedsamples
+		𝑍₁𝑍₂fixedpmf[z1, z2+6] += 1 	# shift z2 to match matrix bounds
+	end
+	𝑍₁𝑍₂fixedpmf ./= N 		  		# normalize
 	
-	DataFrame(𝑍₂𝑍₁fixedpmf, 
+	DataFrame(𝑍₁𝑍₂fixedpmf,
 		["-5", "-4", "-3", "-2", "-1", "0", "1", "2", "3", "4", "5"])
 end
 
 # ╔═╡ 13702d28-557f-4465-9e6f-37ce2779272c
-# marginal pmfs for Z1, Z2
+begin
+	#initialize
+	𝑍₁range = size(𝑍₁𝑍₂fixedpmf, 1)
+	𝑍₁fixedmarginal = zeros(𝑍₁range, 1)
+	
+	for k ∈ 1:𝑍₁range
+		𝑍₁fixedmarginal[k] = sum(𝑍₁𝑍₂fixedpmf[k, :]) # Σₖp(𝑍₂=k|𝑍₁)
+	end
+	
+	DataFrame(𝑍₁fixedmarginal, ["pz₁(k)"])
+end
+
+# ╔═╡ 94d8b859-d2d9-4bea-a83f-40beafa066ab
+begin
+	#initialize
+	𝑍₂range = size(𝑍₁𝑍₂fixedpmf, 2)
+	𝑍₂fixedmarginal = zeros(𝑍₂range, 1)
+	
+	for k ∈ 1:𝑍₂range
+		𝑍₂fixedmarginal[k] = sum(𝑍₁𝑍₂fixedpmf[:, k]) # Σₖp(𝑍₁=k|𝑍₂)
+	end
+	
+	DataFrame(𝑍₂fixedmarginal, ["pz₂(k+6)"])
+end
+
+# ╔═╡ ac225d0a-ec74-4ec7-95d8-25e4b161d940
+begin
+	𝑍₁𝑍₂pmferror = 𝑍₁𝑍₂fixedpmf .- (𝑍₁fixedmarginal*transpose(𝑍₂fixedmarginal)) .|> abs
+	DataFrame(𝑍₁𝑍₂pmferror, 
+		["-5", "-4", "-3", "-2", "-1", "0", "1", "2", "3", "4", "5"])
+end
+
+# ╔═╡ f3f7bc5f-f239-43a5-935b-7f3206b71b68
+# can also check solely over zero indices for consistent mismatches
+
+# ╔═╡ 2f6d0d58-a269-4a2a-b179-8d1acd84fa76
+# p(2,6) is the most effected, can talk about that.
+
+# ╔═╡ 2141a8d4-baa5-46d8-8cd7-1a4f41560245
+md"
+
+An easier test can be using conditional probablity. More specifically,
+
+$P(X=x_0 \mid Y=k) = \frac{p_{X,Y}(x_0, k)}{P(Y=k)} \stackrel{?}{=} P(X=x_0)$
+
+"
+
+# ╔═╡ 02426fae-d44c-45e9-8f98-aa4b6443faca
+begin
+ 
+	𝑍₁𝑍₂fixedpmf[2,0+6]/𝑍₂fixedmarginal[0+6]
+end
+
+# ╔═╡ 9eb66a79-9cc7-491d-ab8d-196935c1f3ff
+𝑍₁fixedmarginal[2]
 
 # ╔═╡ 3a18cc87-1508-483e-9c2d-fa579e7edab4
 md"
@@ -1429,9 +1552,11 @@ version = "0.9.1+5"
 # ╠═041acb21-230f-4f52-b100-bcb41fcace75
 # ╟─9fbd24fb-734f-46ce-9054-9d91f41c3771
 # ╟─64e48ba7-0a94-4958-a290-8852b118c1a2
+# ╠═03170733-aa4e-4f6f-ae42-2eb3e8b81b15
 # ╠═c0073c0b-b582-4740-b392-864058509ef0
 # ╠═2986b6f9-c4d4-4a25-aa42-224be0ba511a
 # ╟─afdd6b30-a443-480c-8dbc-d9b2cbc428f0
+# ╠═3b3daf8e-4cd3-4d07-8adf-a506ee866df0
 # ╟─fb5f69e0-5e71-4e86-89dd-617e32892192
 # ╠═3e2c91cd-23b2-478f-815c-86821d2ccb8d
 # ╟─194eba3b-a6c5-4207-8ba9-21b1aed0d47e
@@ -1443,11 +1568,24 @@ version = "0.9.1+5"
 # ╟─1681aacb-4f0f-449c-999c-9d57fcf19472
 # ╟─267d7b8c-da35-426e-ad06-e9d8819f2728
 # ╟─3bb7548b-d497-4263-80f3-f7c435647d87
+# ╟─957c4115-b763-4ec2-977e-99152cdb1e92
 # ╟─791b5707-cc1e-4892-a761-f9680bc15cec
+# ╠═ba4a439d-ca4b-4153-923a-211e47fa04c7
 # ╠═645bcb94-4d64-4006-8532-55e5aaa01ad5
-# ╠═f71d4aea-f51a-406b-8f5c-85a5aa1a8949
+# ╠═5ebb82a6-f3db-4aae-ada4-4dd48e5e97a5
+# ╠═11c202f6-7b6c-4174-85af-39e81dabf845
+# ╟─1afed4d4-1845-4869-a820-ba8548d62918
+# ╠═a105a25b-d539-46a9-8564-155b450a5768
+# ╟─010f3e24-52e0-4e18-9403-1f5786a56742
 # ╠═a24f058f-92ff-490c-80a6-7f3e7d98184d
 # ╠═13702d28-557f-4465-9e6f-37ce2779272c
+# ╠═94d8b859-d2d9-4bea-a83f-40beafa066ab
+# ╠═ac225d0a-ec74-4ec7-95d8-25e4b161d940
+# ╠═f3f7bc5f-f239-43a5-935b-7f3206b71b68
+# ╠═2f6d0d58-a269-4a2a-b179-8d1acd84fa76
+# ╟─2141a8d4-baa5-46d8-8cd7-1a4f41560245
+# ╠═02426fae-d44c-45e9-8f98-aa4b6443faca
+# ╠═9eb66a79-9cc7-491d-ab8d-196935c1f3ff
 # ╟─3a18cc87-1508-483e-9c2d-fa579e7edab4
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
