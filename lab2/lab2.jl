@@ -289,9 +289,9 @@ md"
 In this section, we will begin by verifing the strong law of large numbers, which says that for the sample mean, or the unbiased estimator for $E[X]$, $M_n =
 \frac{1}{n}\sum_{i=1}^{n}X_i$ of an independent and identically distributed (iid) sequence of random variables with the pdf of $X$, converges almost surely to the theoretical mean, i.e. $M_n \overset{a.s}{\longrightarrow} E[X], n \rightarrow \infty$.This means that the probability associated with the set of realizations of the random process $M_n$ that converge to $E[X]$ is equal to $1$.
 
-Then we will empirically verify the central limit theorem for the same sequence $X_1, X_2, \ldots$ of iid random variables above with mean $\mu$ and variance $\sigma^2$. The theorem states that a process $Z_n = \frac{1}{\sigma\sqrt{n}}\sum_{i=1}^{n}(X_i - \mu)$, will converge in distribution to the univariate normal with zero mean and unit variance, i.e. $Z_n \overset{a.s}{\longrightarrow} \mathcal{N}(0,1), n \rightarrow \infty$.
+Then we will empirically verify the central limit theorem for the same sequence $X_1, X_2, \ldots$ of iid random variables above with mean $\mu$ and variance $\sigma^2$. The theorem states that a process $Z_n = \frac{1}{\sigma\sqrt{n}}\sum_{i=1}^{n}(X_i - \mu)$, will converge in distribution to the univariate normal with zero mean and unit variance, i.e. $Z_n \overset{D}{\longrightarrow} \mathcal{N}(0,1), n \rightarrow \infty$.
 
-We will use a sequaence of iid uniform random variables $X \sim \mathcal{U}(0,1)$ for undertaking both verifications.
+We will use a sequence of iid uniform random variables $X \sim \mathcal{U}(0,1)$ for undertaking both verifications.
 
 "
 
