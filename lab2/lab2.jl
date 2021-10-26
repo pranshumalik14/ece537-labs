@@ -277,16 +277,21 @@ end
 # ╔═╡ 43f302e7-a023-4acc-9a77-d5fb6da5e2c5
 md"
 
-Thus, we have empiricially verified this result for the bivariate case.
+Note that the mean and variance are sufficient statistics to construct the pdf of a collection of samples with an underlying normal distribution, and therefore, we have empiricially verified this result for the bivariate case.
 
 "
 
 # ╔═╡ db4852fe-28f0-470d-b699-a824b77c3961
 md"
 
-## 2. Empirical Confirmation of the Law of Large Numbers and the Central Limit Theorem
+## 2. Empirical Verification of the Law of Large Numbers and the Central Limit Theorem
 
-We will do fancy things this time here.
+In this section, we will begin by verifing the strong law of large numbers, which says that for the sample mean, or the unbiased estimator for $E[X]$, $M_n =
+\frac{1}{n}\sum_{i=1}^{n}X_i$ of an independent and identically distributed (iid) sequence of random variables with the pdf of $X$, converges almost surely to the theoretical mean, i.e. $M_n \overset{a.s}{\longrightarrow} E[X], n \rightarrow \infty$.This means that the probability associated with the set of realizations of the random process $M_n$ that converge to $E[X]$ is equal to $1$.
+
+Then we will empirically verify the central limit theorem for the same sequence $X_1, X_2, \ldots$ of iid random variables above with mean $\mu$ and variance $\sigma^2$. The theorem states that a process $Z_n = \frac{1}{\sigma\sqrt{n}}\sum_{i=1}^{n}(X_i - \mu)$, will converge in distribution to the univariate normal with zero mean and unit variance, i.e. $Z_n \overset{a.s}{\longrightarrow} \mathcal{N}(0,1), n \rightarrow \infty$.
+
+We will use a sequaence of iid uniform random variables $X \sim \mathcal{U}(0,1)$ for undertaking both verifications.
 
 "
 
@@ -295,7 +300,7 @@ md"
 
 ### 2.1 Numerical Simulation
 
-Hello, let's begin.
+Below is a slider for the number of samples we wish to take per random process in this section.
 
 "
 
@@ -303,6 +308,13 @@ Hello, let's begin.
 md"
 
 𝑁₂ = $(@bind N₂ Slider(1:1:100; show_value=true, default=50))
+
+"
+
+# ╔═╡ 8dcd76cd-2f90-4dd7-8f56-9e6eaa716498
+md"
+
+We begin by defining $N_2$ number of uniform random variables, $U_i$, over the support $[0,1]$, which can be viewed as a sequence of iid random variables to construct a random process.
 
 "
 
@@ -315,11 +327,11 @@ md"
 # ╔═╡ e0fcff32-4e61-4422-b040-949edded7ec1
 md"
 
-Define,
+We then define the $n-$degree sum, $S_n$, of the sequence $U_n$,
 
 $S_n = \sum_{i=1}^{n}U_i.$
 
-Then, we would like to check the value of $\frac{S_n}{n}$ as $n$ increases, and if it converges to the mean, as it should being an ubbiased estimator of $E[X]$ for iid $X_i$. <todo: get theorey and setup things here or before in 2.0>. 
+Then, we would like to check if the value of the unbiased mean estimator $M_n = \frac{S_n}{n}$ converges to $E[X]$ as $n$ increases.
 
 "
 
@@ -334,7 +346,7 @@ md"
 
 ### 2.2 Summary of Results
 
-N fixed to 100.
+Here we will empirically test for the convergence of $M_n$ and $Z_n$. We begin by defining $M_n$ by composing $S_n$ and $U_n$ and dividing by the number of iid variables we consider in the sequence, $n$. Then, we test for convergence by plotting $M_n$ for $1 \leq n \leq 1000$ and observe that it is indeed showing convergence to the true mean of the underlying uniform distribution.
 
 
 "
@@ -354,11 +366,9 @@ end
 # ╔═╡ 446c67d5-7639-4893-8202-f235f1d0585f
 md"
 
-Define,
+We can now use the definition of the process $M_n$ to further define $Z_n$ as
 
-$Z_n = \frac{S_n - n\mu}{\sigma\sqrt{n}} = \frac{\sqrt{n}}{\sigma}(M_n - \mu)$
-
-At 100, note that Z_100 would look like S_100 - 50/sqrt(100/12) as the var is this and n is that and the mean is that.
+$Z_n = \frac{S_n - n\mu}{\sigma\sqrt{n}} = \frac{\sqrt{n}}{\sigma}(M_n - \mu).$
 
 "
 
@@ -368,7 +378,7 @@ At 100, note that Z_100 would look like S_100 - 50/sqrt(100/12) as the var is th
 # ╔═╡ 6a315e06-2479-4528-a7d4-bf28ce329dd8
 md"
 
-Let us define a random variable, $Z_{100}$ as:
+Now, we will test for the convergence of the process $Z_n$ by sampling the $Z_{100}$ random variable $N=1000$ times. We will plot the normalized histogram and also the best-fit normal distribution and check if it is close to the theoretical convergence limit $\mathcal{N}(0,1)$.
 
 "
 
@@ -381,29 +391,23 @@ Let us define a random variable, $Z_{100}$ as:
 # ╔═╡ 5d849655-04e3-450f-94df-c53b302d38f0
 let
 	normalhist = normalize(𝑍₁₀₀hist; mode=:pdf)
-	plot(normalhist; label="density histogram")
+	plot(normalhist; label="Empirical Histogram")
 	xlabel!(L"Z_{100}")
 	ylabel!("Normalized Density")
 	title!("Normalized Histogram of Z₁₀₀ over 1000 Samples")
-	plot!(fit(Normal, 𝑍₁₀₀samples); color="orange", linewidth=5, label="he")
+	plot!(fit(Normal, 𝑍₁₀₀samples); color="orange", linewidth=5, label="Estimated Normal pdf")
 end
 
-# ╔═╡ f5800e7c-0f5d-4045-b7c6-7ec40d97345e
-fit(Normal, 𝑍₁₀₀samples)
-
-# ╔═╡ 84fcda05-46a2-4b77-b474-79b098f6c756
-suffstats(Normal, 𝑍₁₀₀samples)
+# ╔═╡ dd96ee87-f278-4e37-ace1-1dad265a76ad
+mean(𝑍₁₀₀samples) # ≈ 0
 
 # ╔═╡ ea0e123c-6b5d-4ae8-9fb9-54b3ec2b5256
-√var(𝑍₁₀₀samples; corrected=false)
-
-# ╔═╡ dd96ee87-f278-4e37-ace1-1dad265a76ad
-mean(𝑍₁₀₀samples)
+var(𝑍₁₀₀samples; corrected=false) # ≈ 1
 
 # ╔═╡ ad5fea86-aac1-4880-8b6e-54bb3265730d
 md"
 
-Theoretically, Zn would coverge to N(0,1). That is similar to what we see. Also corresponds to the maximum likelihood estimate (MLE) of the underlying normal structure.
+Note that the normal distribution constructed using the mean and uncorrected variance of the $Z_{100}$ samples corresponds to the normal maximum likelihood estimate (MLE) of the data, which is close to the theoretical limit of converging to the underlying zero mean and unit variance normal variate structure of $Z_n$ for $n\rightarrow \infty$. 
 
 "
 
@@ -1540,6 +1544,7 @@ version = "0.9.1+5"
 # ╟─db4852fe-28f0-470d-b699-a824b77c3961
 # ╟─e8245df1-9ddf-4869-9748-d14d0af34cff
 # ╟─c7e05572-f25d-451f-a16d-7d23b95b57f3
+# ╟─8dcd76cd-2f90-4dd7-8f56-9e6eaa716498
 # ╠═024931b6-07da-4ed5-ad29-4e78a05023b1
 # ╠═6278ceaa-95a1-41a6-9ba1-01102ed3bab3
 # ╟─e0fcff32-4e61-4422-b040-949edded7ec1
@@ -1554,10 +1559,8 @@ version = "0.9.1+5"
 # ╠═8e8d5823-c6e4-49e2-8aa9-1b5829d34a69
 # ╠═88197dce-a633-4f06-b011-49205f96dc5e
 # ╟─5d849655-04e3-450f-94df-c53b302d38f0
-# ╠═f5800e7c-0f5d-4045-b7c6-7ec40d97345e
-# ╠═84fcda05-46a2-4b77-b474-79b098f6c756
-# ╠═ea0e123c-6b5d-4ae8-9fb9-54b3ec2b5256
 # ╠═dd96ee87-f278-4e37-ace1-1dad265a76ad
+# ╠═ea0e123c-6b5d-4ae8-9fb9-54b3ec2b5256
 # ╟─ad5fea86-aac1-4880-8b6e-54bb3265730d
 # ╟─64984036-d40c-4849-b268-b705e3c90bdb
 # ╟─00000000-0000-0000-0000-000000000001
