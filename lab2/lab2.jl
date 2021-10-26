@@ -23,8 +23,7 @@ PlutoUI.TableOfContents()
 md"
 
 # ECE537: Lab 2 Report
-!!! note 
-	It is recommended to access this report by opening the `html` file on the browser or by clicking [here](https://pranshumalik14.github.io/ece537-labs/lab2/lab2.jl.html).
+> _It is recommended to access this report by opening the `html` file on the browser or by clicking [here](https://pranshumalik14.github.io/ece537-labs/lab2/lab2.jl.html)_.
 
 In the first part of the lab, we will be creating and analyzing joint Gaussian distributions as a part of which we will be extracting marginal densities of correlated joint random variables. In the second part, we will be empirically verifying the central limit theorem and the law of large numbers using uniform (univariate) random variables by testing for the relevant convergence cirtieria.
 
@@ -141,7 +140,7 @@ To see the effects of correlation in bivariate distributions, we will fix the me
 𝑋ᵨsamples = [rand(𝑋, N₁) |> matrixtotuple for 𝑋 ∈ 𝑋ᵨ]
 
 # ╔═╡ 06ba1279-2c12-45f9-88d8-cdcfd4000181
-begin
+let
 	p1 = scatter(𝑋ᵨsamples[1]; label=L"\rho=-1.0", alpha=250.0/N₁, markerstrokewidth=0)
 	p2 = scatter(𝑋ᵨsamples[2]; label=L"\rho=-0.5", alpha=250.0/N₁, markerstrokewidth=0)
 	p3 = scatter(𝑋ᵨsamples[3]; label=L"\rho=0.0", alpha=250.0/N₁, markerstrokewidth=0)
@@ -159,19 +158,126 @@ md"
 
 ### 1.2 Summary of Results
 
-Here we will test for a fixed number of samples, N=100, and then see if the marginal distribution matches the expected distribution and whether the experiemental fit and observed variances match the theoretical answer.
+Here we will test for a fixed number of samples, $N=100$, and observe the characteristics of the bivariate distributions and if they match our expectations.
 
 "
 
 # ╔═╡ 7b833bca-d15e-46e2-a0c4-00ab9b28f178
 N = 100; # fixed number of samples
 
+# ╔═╡ 3626b71b-e650-4bdc-af24-8523e91a2f4e
+md"
+
+The scatter plot for $X \sim \mathcal{N}(\mathbf{0}, \mathbf{I})$ is shown below.
+
+"
+
+# ╔═╡ 3132eb86-e219-4990-8f57-1be55667877a
+𝑋fixedsamples = rand(𝑋, N) |> matrixtotuple;
+
+# ╔═╡ 27d7df82-221c-4ff1-9e6e-996bd1470122
+begin
+	scatter(𝑋fixedsamples; alpha=0.65, legend=false, markerstrokewidth=0, 
+		aspect_ratio=:equal)
+	xlabel!(L"X_1")
+	ylabel!(L"X_2")
+	title!(L"(X_1, X_2) \sim \mathcal{N}(\mathbf{0}, \mathbf{I})")
+end
+
+# ╔═╡ bbc3149b-5c12-4fe3-8fb9-518703e9b733
+md"
+
+As can be seen, both $X_1$ and $X_2$ show equal spread around zero and will thus also have nearly identical marginal densities $f_{X_1}$ and $f_{X_2}$.
+
+Similarly, we will sample the correlated collection of bivariate normals and display their scatter plots below.
+
+"
+
+# ╔═╡ b93ac3f0-dbe3-4608-8149-2191dc4441c5
+𝑋ᵨfixedsamples = [rand(𝑋, N) |> matrixtotuple for 𝑋 ∈ 𝑋ᵨ];
+
+# ╔═╡ 18dfc0b8-cc89-43b9-bb42-05700c467120
+let
+	p1 = scatter(𝑋ᵨfixedsamples[1]; label=L"\rho=-1.0", alpha=45.0/N, 
+		markerstrokewidth=0)
+	p2 = scatter(𝑋ᵨfixedsamples[2]; label=L"\rho=-0.5", alpha=45.0/N, 
+		markerstrokewidth=0)
+	p3 = scatter(𝑋ᵨfixedsamples[3]; label=L"\rho=0.0", alpha=45.0/N, 
+		markerstrokewidth=0)
+	p4 = scatter(𝑋ᵨfixedsamples[4]; label=L"\rho=0.5", alpha=45.0/N, 
+		markerstrokewidth=0)
+	p5 = scatter(𝑋ᵨfixedsamples[5]; label=L"\rho=1.0", alpha=45.0/N, 
+		markerstrokewidth=0)
+	p6 = plot(; framestyle=nothing, showaxis=false, xticks=false, yticks=false, 
+		margin=0mm)
+	p7 = plot(; title="Correlated Bivariate Normals, Xᵨ", framestyle=nothing, 
+		showaxis=false, xticks=false, yticks=false, margin=0mm)
+	plot(p1, p2, p3, p4, p5, p6, p7; layout=@layout([A B; C D; E F; G{-0.05h}]))
+end
+
+# ╔═╡ a0d2913a-2d19-4723-bc77-2ccddab7e8cf
+md"
+
+Thus, we can observe in the plots for $\mathbf{X}_\rho$ above, and in section 1.1 as well, that the correlation coefficient captures the degree to which the joint variates have an affine relationship. For $\rho=-1$, it is exactly the case that $X_2 \propto -X_1$ about the mean, and the opposite, i.e. $X_2 \propto X_1$, for $\rho=1$. For $\rho=0$, there is no single affine relationship explaining the spread of the bivariate distribution and the random variates are thus uncorrelated.
+
+"
+
 # ╔═╡ 05318f3b-2b49-4e73-b147-d4402cbc24f0
 md"
 
-The marginal is of partition is equal to:
+Note, that for any partition of a multivariate normal distribution $\mathbf{Z} \sim \mathcal{N}(\boldsymbol{\mu}_\mathbf{Z}, \boldsymbol{\Sigma}_\mathbf{Z})$ will have the case that
 
-$\mathcal{N}(\boldsymbol{\mu}_\mathbf{X}, \boldsymbol{\Sigma}_{\mathbf{X}\mathbf{X}})$
+$\mathbf{Z} = (\mathbf{X}, \mathbf{Y}) \sim \mathcal{N}\left(
+\begin{bmatrix}
+\boldsymbol{\mu}_\mathbf{X}\\
+\boldsymbol{\mu}_\mathbf{Y}
+\end{bmatrix}, 
+\begin{bmatrix}
+\boldsymbol{\Sigma}_{\mathbf{X}\mathbf{X}} && \boldsymbol{\Sigma}_{\mathbf{X}\mathbf{Y}}\\
+\boldsymbol{\Sigma}_{\mathbf{Y}\mathbf{X}} && \boldsymbol{\Sigma}_{\mathbf{Y}\mathbf{Y}}
+\end{bmatrix}
+\right)$
+
+where,
+
+$\boldsymbol{\mu}_\mathbf{X} = E[\mathbf{X}]\text{, } \boldsymbol{\Sigma}_{\mathbf{X}\mathbf{X}} = E[(\mathbf{X}−\boldsymbol{\mu}_\mathbf{X})(\mathbf{X}−\boldsymbol{\mu}_\mathbf{X})^\intercal] \text{, and } \boldsymbol{\Sigma}_{\mathbf{X}\mathbf{Y}} = E[(\mathbf{X}−\boldsymbol{\mu}_\mathbf{X})(\mathbf{Y}−\boldsymbol{\mu}_\mathbf{Y})^\intercal]$
+
+Similar definitions follow for $\mathbf{Y}$, where $\boldsymbol{\Sigma}_{\mathbf{Y}\mathbf{X}} = \boldsymbol{\Sigma}_{\mathbf{X}\mathbf{Y}}^\intercal$.
+
+The marginal distributions, as we visually guessed before, are
+
+$\mathbf{X} \sim \mathcal{N}(\boldsymbol{\mu}_\mathbf{X}, \boldsymbol{\Sigma}_{\mathbf{X}\mathbf{X}}) \text{, and } \mathbf{Y} \sim \mathcal{N}(\boldsymbol{\mu}_\mathbf{Y}, \boldsymbol{\Sigma}_{\mathbf{Y}\mathbf{Y}}).$ 
+
+In higher dimensions, these will also be joint normal distributions. To verify this general result for the simpler bivariate case, we will choose $\mathbf{X}_\rho$ with $\rho=0.5$ above and extract the marginal density for $X_1$ which should approximately be the univariate $\mathcal{N}(\mu_1=1, \sigma_1^2 = 2)$.
+
+"
+
+# ╔═╡ 1c76cbbf-463f-49ac-b0f6-41c2144fc04e
+𝑋₁samples = [X[1] for X ∈ 𝑋ᵨfixedsamples[4]];
+
+# ╔═╡ 8a067a43-cecc-4b8c-b924-64b213874f05
+mean(𝑋₁samples) # ≈ 1
+
+# ╔═╡ b1520d42-b028-4bcd-bab3-5074a741712e
+var(𝑋₁samples; corrected=false) # ≈ 2
+
+# ╔═╡ 14710a6d-db15-4bbd-89ea-f10fcddffc70
+𝑋₁hist = fit(Histogram, 𝑋₁samples, nbins=10);
+
+# ╔═╡ c946a8a0-10cd-4780-8c8d-202dc6b32a0e
+let
+	normalhist = normalize(𝑋₁hist; mode=:pdf)
+	plot(normalhist; label="Marginal Histogram")
+	xlabel!(L"X_1")
+	ylabel!("Normalized Density")
+	title!("Normalized Histogram of X₁ in Xᵨ(ρ=0.5)")
+	plot!(fit(Normal, 𝑋₁samples); color="orange", linewidth=5, label="Marginal pdf")
+end
+
+# ╔═╡ 43f302e7-a023-4acc-9a77-d5fb6da5e2c5
+md"
+
+Thus, we have empiricially verified this result for the bivariate case.
 
 "
 
@@ -196,7 +302,7 @@ Hello, let's begin.
 # ╔═╡ c7e05572-f25d-451f-a16d-7d23b95b57f3
 md"
 
-𝑁₂ = $(@bind N₂ Slider(1:1:1000; show_value=true, default=50))
+𝑁₂ = $(@bind N₂ Slider(1:1:100; show_value=true, default=50))
 
 "
 
@@ -238,7 +344,11 @@ N fixed to 100.
 
 # ╔═╡ b43f46c7-8d60-40ba-a0e9-cc719a60252f
 begin
-	plot(𝑀, 1:1000)
+	plot(𝑀, 1:1000; label=L"M_n")
+	plot!(n->0.5, 1:1000; line=:dash, linewidth=3, label="True Mean")
+	title!("Convergence of Mₙ")
+	xlabel!("n")
+	ylabel!("Statistic")
 end
 
 # ╔═╡ 446c67d5-7639-4893-8202-f235f1d0585f
@@ -266,11 +376,11 @@ Let us define a random variable, $Z_{100}$ as:
 𝑍₁₀₀samples = [𝑍(100, 0.5, 1/√12) for n ∈ 1:1000];
 
 # ╔═╡ 88197dce-a633-4f06-b011-49205f96dc5e
-h = fit(Histogram, 𝑍₁₀₀samples, nbins=15);
+𝑍₁₀₀hist = fit(Histogram, 𝑍₁₀₀samples, nbins=15);
 
 # ╔═╡ 5d849655-04e3-450f-94df-c53b302d38f0
-begin
-	normalhist = normalize(h; mode=:pdf)
+let
+	normalhist = normalize(𝑍₁₀₀hist; mode=:pdf)
 	plot(normalhist; label="density histogram")
 	xlabel!(L"Z_{100}")
 	ylabel!("Normalized Density")
@@ -293,7 +403,7 @@ mean(𝑍₁₀₀samples)
 # ╔═╡ ad5fea86-aac1-4880-8b6e-54bb3265730d
 md"
 
-Theoretically, Zn would coverge to N(0,1). That is similar to what we see.
+Theoretically, Zn would coverge to N(0,1). That is similar to what we see. Also corresponds to the maximum likelihood estimate (MLE) of the underlying normal structure.
 
 "
 
@@ -1402,7 +1512,7 @@ version = "0.9.1+5"
 # ╟─e2b52309-9b20-4ee8-b22c-a10bbc01ce37
 # ╠═11861633-309d-4a19-bab0-88cc752fb6a5
 # ╠═5f5998fc-8954-4738-ab9e-54e5db821eb2
-# ╠═fae5f520-cd44-4595-b5b8-e87fe215d15d
+# ╟─fae5f520-cd44-4595-b5b8-e87fe215d15d
 # ╟─1f7c1317-10e9-4e3f-ba24-9fa337a5a4da
 # ╟─4caafd5b-f077-4238-b9a5-5b72d0b5f9ac
 # ╠═9f1001fc-f7cb-47e6-abc2-3c46d05d4ade
@@ -1413,7 +1523,20 @@ version = "0.9.1+5"
 # ╟─06ba1279-2c12-45f9-88d8-cdcfd4000181
 # ╟─a4e41a9b-e396-42df-a9ef-04c9f7206cc9
 # ╠═7b833bca-d15e-46e2-a0c4-00ab9b28f178
+# ╟─3626b71b-e650-4bdc-af24-8523e91a2f4e
+# ╠═3132eb86-e219-4990-8f57-1be55667877a
+# ╟─27d7df82-221c-4ff1-9e6e-996bd1470122
+# ╟─bbc3149b-5c12-4fe3-8fb9-518703e9b733
+# ╠═b93ac3f0-dbe3-4608-8149-2191dc4441c5
+# ╟─18dfc0b8-cc89-43b9-bb42-05700c467120
+# ╟─a0d2913a-2d19-4723-bc77-2ccddab7e8cf
 # ╟─05318f3b-2b49-4e73-b147-d4402cbc24f0
+# ╠═1c76cbbf-463f-49ac-b0f6-41c2144fc04e
+# ╠═8a067a43-cecc-4b8c-b924-64b213874f05
+# ╠═b1520d42-b028-4bcd-bab3-5074a741712e
+# ╠═14710a6d-db15-4bbd-89ea-f10fcddffc70
+# ╟─c946a8a0-10cd-4780-8c8d-202dc6b32a0e
+# ╟─43f302e7-a023-4acc-9a77-d5fb6da5e2c5
 # ╟─db4852fe-28f0-470d-b699-a824b77c3961
 # ╟─e8245df1-9ddf-4869-9748-d14d0af34cff
 # ╟─c7e05572-f25d-451f-a16d-7d23b95b57f3
@@ -1424,7 +1547,7 @@ version = "0.9.1+5"
 # ╠═b0fa3ca1-5755-49a7-8f2d-f6153bc2c081
 # ╟─90bbbba1-2293-4455-9892-d54c080f0f79
 # ╠═b3454e47-4c42-47ca-9336-497ecb3ce0e1
-# ╠═b43f46c7-8d60-40ba-a0e9-cc719a60252f
+# ╟─b43f46c7-8d60-40ba-a0e9-cc719a60252f
 # ╟─446c67d5-7639-4893-8202-f235f1d0585f
 # ╠═86e60e23-79b0-4dec-9623-105277c817dc
 # ╟─6a315e06-2479-4528-a7d4-bf28ce329dd8
