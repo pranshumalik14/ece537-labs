@@ -86,17 +86,22 @@ end
 # ╔═╡ 5f5998fc-8954-4738-ab9e-54e5db821eb2
 𝑋samples = rand(𝑋, N₁) |> matrixtotuple;
 
+# ╔═╡ 1f7c1317-10e9-4e3f-ba24-9fa337a5a4da
+begin
+	using Measures
+	marginal = marginalkde([x[1] for x ∈ 𝑋samples], [x[2] for x ∈ 𝑋samples]; levels=5)
+	title = plot(;title="Contours and Marginal Densities", framestyle=nothing, 
+		showaxis=false, xticks=false, yticks=false, margin=0mm)
+	plot(marginal, title; layout=@layout([A; B{0.01h}]))
+end
+
 # ╔═╡ fae5f520-cd44-4595-b5b8-e87fe215d15d
 begin
-	scatter(𝑋samples, alpha=800.0/N₁, legend=false, markerstrokewidth=0)
+	scatter(𝑋samples; alpha=800.0/N₁, legend=false, markerstrokewidth=0, 
+		aspect_ratio=:equal)
 	xlabel!(L"X_1")
 	ylabel!(L"X_2")
 	title!(L"(X_1, X_2) \sim \mathcal{N}(\mathbf{0}, \mathbf{I})")
-end
-
-# ╔═╡ 1f7c1317-10e9-4e3f-ba24-9fa337a5a4da
-begin
-	marginalhist(𝑋samples; bins=50)
 end
 
 # ╔═╡ 4caafd5b-f077-4238-b9a5-5b72d0b5f9ac
@@ -113,8 +118,8 @@ Now, we will also define correlated bivartie normal distributions. Since, the co
 function Σ(σ₁, σ₂, ρ)
 	@assert abs(ρ) ≤ 1
 	
-	# add epsilon for numerical stability
-	ϵ = 0.0001
+	# add epsilon along diagonal for enhanced numerical stability
+	ϵ = 1e-6
 	return ϵ*I(2) + [σ₁^2    ρ*σ₁*σ₂;
 				 	 ρ*σ₁*σ₂ σ₂^2]
 end
@@ -168,10 +173,128 @@ Here we will test for a fixed number of samples, N=100, and then see if the marg
 
 "
 
+# ╔═╡ 7b833bca-d15e-46e2-a0c4-00ab9b28f178
+N = 100; # fixed number of samples
+
 # ╔═╡ db4852fe-28f0-470d-b699-a824b77c3961
 md"
 
-## 2. 
+## 2. Empirical Confirmation of the Law of Large Numbers and the Central Limit Theorem
+
+We will do fancy things this time here.
+
+"
+
+# ╔═╡ e8245df1-9ddf-4869-9748-d14d0af34cff
+md"
+
+### 2.1 Numerical Simulation
+
+Hello, let's begin.
+
+"
+
+# ╔═╡ c7e05572-f25d-451f-a16d-7d23b95b57f3
+md"
+
+𝑁₂ = $(@bind N₂ Slider(1:1:1000; show_value=true, default=50))
+
+"
+
+# ╔═╡ 024931b6-07da-4ed5-ad29-4e78a05023b1
+𝑈(n) = [Uniform(0, 1) for n ∈ 1:n]
+
+# ╔═╡ 6278ceaa-95a1-41a6-9ba1-01102ed3bab3
+𝑈ₙ = 𝑈(N₂);
+
+# ╔═╡ e0fcff32-4e61-4422-b040-949edded7ec1
+md"
+
+Define,
+
+$S_n = \sum_{i=1}^{n}U_i.$
+
+Then, we would like to check the value of $\frac{S_n}{n}$ as $n$ increases, and if it converges to the mean, as it should being an ubbiased estimator of $E[X]$ for iid $X_i$. <todo: get theorey and setup things here or before in 2.0>. 
+
+"
+
+# ╔═╡ 55a6f583-eb2a-4969-bf00-e51b1abe6fa3
+𝑆(𝑈ₙ) = rand.(𝑈ₙ) |> sum
+
+# ╔═╡ b0fa3ca1-5755-49a7-8f2d-f6153bc2c081
+𝑀ₙ = 𝑆(𝑈ₙ)/length(𝑈ₙ)
+
+# ╔═╡ 90bbbba1-2293-4455-9892-d54c080f0f79
+md"
+
+### 2.2 Summary of Results
+
+N fixed to 100.
+
+
+"
+
+# ╔═╡ b3454e47-4c42-47ca-9336-497ecb3ce0e1
+𝑀(n) = (𝑆 ∘ 𝑈)(n)/n
+
+# ╔═╡ b43f46c7-8d60-40ba-a0e9-cc719a60252f
+begin
+	plot(𝑀, 1:1000)
+end
+
+# ╔═╡ 446c67d5-7639-4893-8202-f235f1d0585f
+md"
+
+Define,
+
+$Z_n = \frac{S_n - n\mu}{\sigma\sqrt{n}} = \frac{\sqrt{n}}{\sigma}(M_n - \mu)$
+
+At 100, note that Z_100 would look like S_100 - 50/sqrt(100/12) as the var is this and n is that and the mean is that.
+
+"
+
+# ╔═╡ 86e60e23-79b0-4dec-9623-105277c817dc
+𝑍(n, μ, σ) = (𝑀(n) - μ) * (√n)/σ
+
+# ╔═╡ 6a315e06-2479-4528-a7d4-bf28ce329dd8
+md"
+
+Let us define a random variable, $Z_{100}$ as:
+
+"
+
+# ╔═╡ 8e8d5823-c6e4-49e2-8aa9-1b5829d34a69
+𝑍₁₀₀samples = [𝑍(100, 0.5, 1/√12) for n ∈ 1:1000];
+
+# ╔═╡ 88197dce-a633-4f06-b011-49205f96dc5e
+h = fit(Histogram, 𝑍₁₀₀samples, nbins=15);
+
+# ╔═╡ 5d849655-04e3-450f-94df-c53b302d38f0
+begin
+	normalhist = normalize(h; mode=:pdf)
+	plot(normalhist; label="density histogram")
+	xlabel!(L"Z_{100}")
+	ylabel!("Normalized Density")
+	title!("Normalized Histogram of Z₁₀₀ over 1000 Samples")
+	plot!(fit(Normal, 𝑍₁₀₀samples); color="orange", linewidth=5, label="he")
+end
+
+# ╔═╡ f5800e7c-0f5d-4045-b7c6-7ec40d97345e
+fit(Normal, 𝑍₁₀₀samples)
+
+# ╔═╡ 84fcda05-46a2-4b77-b474-79b098f6c756
+suffstats(Normal, 𝑍₁₀₀samples)
+
+# ╔═╡ ea0e123c-6b5d-4ae8-9fb9-54b3ec2b5256
+√var(𝑍₁₀₀samples; corrected=false)
+
+# ╔═╡ dd96ee87-f278-4e37-ace1-1dad265a76ad
+mean(𝑍₁₀₀samples)
+
+# ╔═╡ ad5fea86-aac1-4880-8b6e-54bb3265730d
+md"
+
+Theoretically, Zn would coverge to N(0,1). That is similar to what we see.
 
 "
 
@@ -191,6 +314,7 @@ DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
 Distributions = "31c24e10-a181-5473-b8eb-7969acd0382f"
 LaTeXStrings = "b964fa9f-0449-5b57-a5c2-d3ea65f4040f"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
+Measures = "442fdcdd-2543-5da2-b0f3-8c86c306513e"
 PlutoUI = "7f904dfe-b85e-4ff6-b463-dae2292396a8"
 Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
 StatsBase = "2913bbd2-ae8a-5f71-8c99-4fb6c76f3a91"
@@ -200,6 +324,7 @@ StatsPlots = "f3b207a7-027a-5e70-b257-86293d7955fd"
 DataFrames = "~1.2.2"
 Distributions = "~0.25.21"
 LaTeXStrings = "~1.2.1"
+Measures = "~0.3.1"
 PlutoUI = "~0.7.16"
 StatsBase = "~0.33.12"
 StatsPlots = "~0.14.28"
@@ -857,9 +982,9 @@ version = "1.0.15"
 
 [[Plots]]
 deps = ["Base64", "Contour", "Dates", "Downloads", "FFMPEG", "FixedPointNumbers", "GR", "GeometryBasics", "JSON", "Latexify", "LinearAlgebra", "Measures", "NaNMath", "PlotThemes", "PlotUtils", "Printf", "REPL", "Random", "RecipesBase", "RecipesPipeline", "Reexport", "Requires", "Scratch", "Showoff", "SparseArrays", "Statistics", "StatsBase", "UUIDs"]
-git-tree-sha1 = "e7523dd03eb3aaac09f743c23c1a553a8c834416"
+git-tree-sha1 = "68a8a1f4d5763271d38847f0e22d67a7a61b6565"
 uuid = "91a5bcdd-55d7-5caf-9e0b-520d859cae80"
-version = "1.22.7"
+version = "1.23.0"
 
 [[PlutoUI]]
 deps = ["Base64", "Dates", "Hyperscript", "HypertextLiteral", "IOCapture", "InteractiveUtils", "JSON", "Logging", "Markdown", "Random", "Reexport", "UUIDs"]
@@ -1328,7 +1453,29 @@ version = "0.9.1+5"
 # ╠═53c02a85-285f-447d-b188-9952dd8d2733
 # ╠═5645b874-5a0f-467a-9d6f-1b0d3fb382f1
 # ╟─a4e41a9b-e396-42df-a9ef-04c9f7206cc9
-# ╠═db4852fe-28f0-470d-b699-a824b77c3961
+# ╠═7b833bca-d15e-46e2-a0c4-00ab9b28f178
+# ╟─db4852fe-28f0-470d-b699-a824b77c3961
+# ╟─e8245df1-9ddf-4869-9748-d14d0af34cff
+# ╟─c7e05572-f25d-451f-a16d-7d23b95b57f3
+# ╠═024931b6-07da-4ed5-ad29-4e78a05023b1
+# ╠═6278ceaa-95a1-41a6-9ba1-01102ed3bab3
+# ╟─e0fcff32-4e61-4422-b040-949edded7ec1
+# ╠═55a6f583-eb2a-4969-bf00-e51b1abe6fa3
+# ╠═b0fa3ca1-5755-49a7-8f2d-f6153bc2c081
+# ╟─90bbbba1-2293-4455-9892-d54c080f0f79
+# ╠═b3454e47-4c42-47ca-9336-497ecb3ce0e1
+# ╟─b43f46c7-8d60-40ba-a0e9-cc719a60252f
+# ╟─446c67d5-7639-4893-8202-f235f1d0585f
+# ╠═86e60e23-79b0-4dec-9623-105277c817dc
+# ╟─6a315e06-2479-4528-a7d4-bf28ce329dd8
+# ╠═8e8d5823-c6e4-49e2-8aa9-1b5829d34a69
+# ╠═88197dce-a633-4f06-b011-49205f96dc5e
+# ╟─5d849655-04e3-450f-94df-c53b302d38f0
+# ╠═f5800e7c-0f5d-4045-b7c6-7ec40d97345e
+# ╠═84fcda05-46a2-4b77-b474-79b098f6c756
+# ╠═ea0e123c-6b5d-4ae8-9fb9-54b3ec2b5256
+# ╠═dd96ee87-f278-4e37-ace1-1dad265a76ad
+# ╟─ad5fea86-aac1-4880-8b6e-54bb3265730d
 # ╟─64984036-d40c-4849-b268-b705e3c90bdb
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
