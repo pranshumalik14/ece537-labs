@@ -14,7 +14,7 @@ macro bind(def, element)
 end
 
 # ╔═╡ a32840fb-a432-408c-be05-d37f4f95b0e7
-using Random, Distributions, StatsBase, StatsPlots, LinearAlgebra, DataFrames, LaTeXStrings, PlutoUI
+using Distributions, StatsBase, StatsPlots, LinearAlgebra, LaTeXStrings, PlutoUI, Measures
 
 # ╔═╡ e0b06eb0-0cea-4491-8bad-1d0b19dc2ffc
 PlutoUI.TableOfContents()
@@ -23,9 +23,10 @@ PlutoUI.TableOfContents()
 md"
 
 # ECE537: Lab 2 Report
-> _It is recommended to access this report by opening the `html` file on the browser or by clicking [here](https://pranshumalik14.github.io/ece537-labs/lab2/lab2.jl.html)_.
+!!! note 
+	It is recommended to access this report by opening the `html` file on the browser or by clicking [here](https://pranshumalik14.github.io/ece537-labs/lab2/lab2.jl.html).
 
-In the first part of the lab, we will be creating and analyzing joint Gaussian distributions as a part of which we will be extracting marginal densities of the joint random variables. In the second part, we will be simulating the central limit theorem and the law of large numbers with uniform (univariate) random variables and test for the relevant convergence cirtieria.
+In the first part of the lab, we will be creating and analyzing joint Gaussian distributions as a part of which we will be extracting marginal densities of correlated joint random variables. In the second part, we will be empirically verifying the central limit theorem and the law of large numbers using uniform (univariate) random variables by testing for the relevant convergence cirtieria.
 
 Throughout this lab, the [Distributions.jl](https://github.com/JuliaStats/Distributions.jl) package in Julia has been utilized to be able to use the probabllity constructs in code.
 
@@ -36,7 +37,7 @@ md"
 
 ## 1.Simulating Bivariate Gaussian Distributions
 
-The multivariate normal (or Gaussian) distribution is a multidimensional generalization of the normal distribution. The probability density function of a $n$-dimensional multivariate normal distribution with mean vector $\boldsymbol{\mu}$ and (positive definite) covariance matrix $\boldsymbol{\Sigma}$ is:
+The multivariate normal (or Gaussian) distribution is a multidimensional generalization of the normal distribution. The probability density function of a $n$-dimensional multivariate normal distribution with mean vector $\boldsymbol{\mu}$ and (symmetric, positive definite) covariance matrix $\boldsymbol{\Sigma}$ is:
 
 $f_{\mathbf{X}}(\mathbf{x}; \boldsymbol{\mu},\boldsymbol{\Sigma}) = \frac{1}{\sqrt{(2\pi)^n \text{det}(\boldsymbol{\Sigma})}} \exp\left(-\frac{1}{2}(\mathbf{x}-\boldsymbol{\mu})^\intercal\boldsymbol{\Sigma}^{-1}(\mathbf{x}-\boldsymbol{\mu})\right).$
 
@@ -62,11 +63,11 @@ md"
 
 ### 1.1 Numerical Simulation
 
-We will now define and sample various bivariate normal distributions and inspect their coverage and densities through scatter plots. Below is a slider for the number of samples we wish to take of all the distributions.
+We will now define and sample various bivariate normal distributions and inspect their coverage and densities through scatter plots. Below is a slider for the number of samples we wish to take per distribution in this section.
 
-𝑁₁ = $(@bind N₁ Slider(50:50:7000; show_value=true, default=3000))
+𝑁₁ = $(@bind N₁ Slider(50:50:1600; show_value=true, default=800))
 
-We define below an uncorrelated bivariate normal distribution with zero mean and unit variances, $X \sim \mathcal{N}(\mathbf{0}, \text{Diag}(1,1))$:
+We will start by defining an uncorrelated bivariate normal distribution with zero mean and unit variance, $X \sim \mathcal{N}(\mathbf{0}, \mathbf{I})$. After sampling the distribution $N_1$ times, we also show the scatter and contour plots for the variate.
 
 "
 
@@ -86,31 +87,30 @@ end
 # ╔═╡ 5f5998fc-8954-4738-ab9e-54e5db821eb2
 𝑋samples = rand(𝑋, N₁) |> matrixtotuple;
 
-# ╔═╡ 1f7c1317-10e9-4e3f-ba24-9fa337a5a4da
-begin
-	using Measures
-	marginal = marginalkde([x[1] for x ∈ 𝑋samples], [x[2] for x ∈ 𝑋samples]; levels=5)
-	title = plot(;title="Contours and Marginal Densities", framestyle=nothing, 
-		showaxis=false, xticks=false, yticks=false, margin=0mm)
-	plot(marginal, title; layout=@layout([A; B{0.01h}]))
-end
-
 # ╔═╡ fae5f520-cd44-4595-b5b8-e87fe215d15d
 begin
-	scatter(𝑋samples; alpha=800.0/N₁, legend=false, markerstrokewidth=0, 
-		aspect_ratio=:equal)
+	scatter(𝑋samples; alpha=450.0/N₁, legend=false, markerstrokewidth=0)
 	xlabel!(L"X_1")
 	ylabel!(L"X_2")
 	title!(L"(X_1, X_2) \sim \mathcal{N}(\mathbf{0}, \mathbf{I})")
 end
 
+# ╔═╡ 1f7c1317-10e9-4e3f-ba24-9fa337a5a4da
+begin
+	marginal = marginalkde([x[1] for x ∈ 𝑋samples], [x[2] for x ∈ 𝑋samples]; levels=5)
+	title = plot(;title="Contours and Marginal Densities of N(0,I)", 
+		framestyle=nothing, showaxis=false, xticks=false, yticks=false, margin=0mm)
+	plot(marginal, title; layout=@layout([A; B{0.01h}]))
+end
+
 # ╔═╡ 4caafd5b-f077-4238-b9a5-5b72d0b5f9ac
 md"
 
-!!! note
-    rewrite this section!!
+On first look, and especially after visually adjusting the aspect ratios, the $X_1$ and $X_2$ marginal densities look nearly identical in trend and suggest that they are the same as the partitioned distributions of the bivariate. We will verify and formally present the this idea in the next section.
 
-Now, we will also define correlated bivartie normal distributions. Since, the covariance matrix depends on the correlation coefficient, $\rho$ and the standrd devaiations $\sigma_1, \sigma_2$, we will define a generic function, $\boldsymbol{\Sigma}(\rho, \sigma_1, \sigma_2)$, to generate such matrices for valid covaraince matrices.
+Now, we will define a collection of bivariate normal distributions with varying degree of correlation to see its effects qualitatively.
+
+Since, the covariance matrix depends on the correlation coefficient, $\rho$ and the standrd devaiations $\sigma_1, \sigma_2$, we will define a generic function, $\boldsymbol{\Sigma}(\sigma_1, \sigma_2, \rho)$, for generating valid covariance matrices based on these parameters.
 
 "
 
@@ -118,7 +118,7 @@ Now, we will also define correlated bivartie normal distributions. Since, the co
 function Σ(σ₁, σ₂, ρ)
 	@assert abs(ρ) ≤ 1
 	
-	# add epsilon along diagonal for enhanced numerical stability
+	# add epsilon along diagonal for numerical stability during cholesky decomposition
 	ϵ = 1e-6
 	return ϵ*I(2) + [σ₁^2    ρ*σ₁*σ₂;
 				 	 ρ*σ₁*σ₂ σ₂^2]
@@ -127,7 +127,7 @@ end
 # ╔═╡ a647164f-8585-40bf-9036-729da288a0ca
 md"
 
-Now, we will define 5 distributins with all with mean [1 2]^T and std. dev []^T and corr = {-1, -0.5, 0, 0.5, 1}
+To see the effects of correlation in bivariate distributions, we will fix the mean across all distributions and only vary $\rho$. Therefore, we define $5$ distributions with mean $\boldsymbol{\mu} = \begin{bmatrix}1 & 2\end{bmatrix}^\intercal$, variance $\sigma_1^2 = 2$, $\sigma_2^2 = 1$, and correlation coefficient ranging from $\rho = -1.0$ to $\rho = 1.0$ in increments of $0.5$. These distributions are stored in the $\mathbf{X}_\rho$ vector.
 
 "
 
@@ -137,32 +137,22 @@ Now, we will define 5 distributins with all with mean [1 2]^T and std. dev []^T 
 # ╔═╡ c7a54c8f-f68a-4f6f-ab33-0aff066f4542
 𝑋ᵨ = [MvNormal(μ, Σ(√2, 1, ρ)) for ρ ∈ -1:0.5:1];
 
-# ╔═╡ 05318f3b-2b49-4e73-b147-d4402cbc24f0
-md"
-
-The marginal is of partition is equal to:
-
-$\mathcal{N}(\boldsymbol{\mu}_\mathbf{X}, \boldsymbol{\Sigma}_{\mathbf{X}\mathbf{X}})$
-
-"
-
 # ╔═╡ ae16d377-2f11-4b64-baa1-d1ad1f629b9b
 𝑋ᵨsamples = [rand(𝑋, N₁) |> matrixtotuple for 𝑋 ∈ 𝑋ᵨ]
 
 # ╔═╡ 06ba1279-2c12-45f9-88d8-cdcfd4000181
-scatter(𝑋ᵨsamples[1])
-
-# ╔═╡ 43174d96-c3aa-4349-9be3-6e3008c47ce2
-scatter(𝑋ᵨsamples[2])
-
-# ╔═╡ 0f288920-2f54-4391-965f-236afc8ffb2b
-scatter(𝑋ᵨsamples[3])
-
-# ╔═╡ 53c02a85-285f-447d-b188-9952dd8d2733
-scatter(𝑋ᵨsamples[4])
-
-# ╔═╡ 5645b874-5a0f-467a-9d6f-1b0d3fb382f1
-scatter(𝑋ᵨsamples[5])
+begin
+	p1 = scatter(𝑋ᵨsamples[1]; label=L"\rho=-1.0", alpha=250.0/N₁, markerstrokewidth=0)
+	p2 = scatter(𝑋ᵨsamples[2]; label=L"\rho=-0.5", alpha=250.0/N₁, markerstrokewidth=0)
+	p3 = scatter(𝑋ᵨsamples[3]; label=L"\rho=0.0", alpha=250.0/N₁, markerstrokewidth=0)
+	p4 = scatter(𝑋ᵨsamples[4]; label=L"\rho=0.5", alpha=250.0/N₁, markerstrokewidth=0)
+	p5 = scatter(𝑋ᵨsamples[5]; label=L"\rho=1.0", alpha=250.0/N₁, markerstrokewidth=0)
+	p6 = plot(; framestyle=nothing, showaxis=false, xticks=false, yticks=false, 
+		margin=0mm)
+	p7 = plot(; title="Correlated Bivariate Normals, Xᵨ", framestyle=nothing, 
+		showaxis=false, xticks=false, yticks=false, margin=0mm)
+	plot(p1, p2, p3, p4, p5, p6, p7; layout=@layout([A B; C D; E F; G{-0.05h}]))
+end
 
 # ╔═╡ a4e41a9b-e396-42df-a9ef-04c9f7206cc9
 md"
@@ -175,6 +165,15 @@ Here we will test for a fixed number of samples, N=100, and then see if the marg
 
 # ╔═╡ 7b833bca-d15e-46e2-a0c4-00ab9b28f178
 N = 100; # fixed number of samples
+
+# ╔═╡ 05318f3b-2b49-4e73-b147-d4402cbc24f0
+md"
+
+The marginal is of partition is equal to:
+
+$\mathcal{N}(\boldsymbol{\mu}_\mathbf{X}, \boldsymbol{\Sigma}_{\mathbf{X}\mathbf{X}})$
+
+"
 
 # ╔═╡ db4852fe-28f0-470d-b699-a824b77c3961
 md"
@@ -235,7 +234,7 @@ N fixed to 100.
 "
 
 # ╔═╡ b3454e47-4c42-47ca-9336-497ecb3ce0e1
-𝑀(n) = (𝑆 ∘ 𝑈)(n)/n
+𝑀(n) = (𝑆 ∘ 𝑈)(n)/n # composing the S and U definitions over n
 
 # ╔═╡ b43f46c7-8d60-40ba-a0e9-cc719a60252f
 begin
@@ -310,18 +309,15 @@ Note that this lab report can be run on the cloud and viewed as is on the github
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
 [deps]
-DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
 Distributions = "31c24e10-a181-5473-b8eb-7969acd0382f"
 LaTeXStrings = "b964fa9f-0449-5b57-a5c2-d3ea65f4040f"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 Measures = "442fdcdd-2543-5da2-b0f3-8c86c306513e"
 PlutoUI = "7f904dfe-b85e-4ff6-b463-dae2292396a8"
-Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
 StatsBase = "2913bbd2-ae8a-5f71-8c99-4fb6c76f3a91"
 StatsPlots = "f3b207a7-027a-5e70-b257-86293d7955fd"
 
 [compat]
-DataFrames = "~1.2.2"
 Distributions = "~0.25.21"
 LaTeXStrings = "~1.2.1"
 Measures = "~0.3.1"
@@ -431,21 +427,10 @@ git-tree-sha1 = "9f02045d934dc030edad45944ea80dbd1f0ebea7"
 uuid = "d38c429a-6771-53c6-b99e-75d170b6e991"
 version = "0.5.7"
 
-[[Crayons]]
-git-tree-sha1 = "3f71217b538d7aaee0b69ab47d9b7724ca8afa0d"
-uuid = "a8cc5b0e-0ffa-5ad4-8c14-923d3ee1735f"
-version = "4.0.4"
-
 [[DataAPI]]
 git-tree-sha1 = "cc70b17275652eb47bc9e5f81635981f13cea5c8"
 uuid = "9a962f9c-6df0-11e9-0e5d-c546b8b5ee8a"
 version = "1.9.0"
-
-[[DataFrames]]
-deps = ["Compat", "DataAPI", "Future", "InvertedIndices", "IteratorInterfaceExtensions", "LinearAlgebra", "Markdown", "Missings", "PooledArrays", "PrettyTables", "Printf", "REPL", "Reexport", "SortingAlgorithms", "Statistics", "TableTraits", "Tables", "Unicode"]
-git-tree-sha1 = "d785f42445b63fc86caa08bb9a9351008be9b765"
-uuid = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
-version = "1.2.2"
 
 [[DataStructures]]
 deps = ["Compat", "InteractiveUtils", "OrderedCollections"]
@@ -570,10 +555,6 @@ git-tree-sha1 = "aa31987c2ba8704e23c6c8ba8a4f769d5d7e4f91"
 uuid = "559328eb-81f9-559d-9380-de523a88c83c"
 version = "1.0.10+0"
 
-[[Future]]
-deps = ["Random"]
-uuid = "9fa8497b-333b-5362-9e8d-4d0656e87820"
-
 [[GLFW_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Libglvnd_jll", "Pkg", "Xorg_libXcursor_jll", "Xorg_libXi_jll", "Xorg_libXinerama_jll", "Xorg_libXrandr_jll"]
 git-tree-sha1 = "dba1e8614e98949abfa60480b13653813d8f0157"
@@ -677,11 +658,6 @@ deps = ["Test"]
 git-tree-sha1 = "f0c6489b12d28fb4c2103073ec7452f3423bd308"
 uuid = "3587e190-3f89-42d0-90ee-14403ec27112"
 version = "0.1.1"
-
-[[InvertedIndices]]
-git-tree-sha1 = "bee5f1ef5bf65df56bdd2e40447590b272a5471f"
-uuid = "41ab1584-1d38-5bbf-9106-f11c6c58b48f"
-version = "1.1.0"
 
 [[IrrationalConstants]]
 git-tree-sha1 = "7fd44fd4ff43fc60815f8e764c0f352b83c49151"
@@ -992,23 +968,11 @@ git-tree-sha1 = "4c8a7d080daca18545c56f1cac28710c362478f3"
 uuid = "7f904dfe-b85e-4ff6-b463-dae2292396a8"
 version = "0.7.16"
 
-[[PooledArrays]]
-deps = ["DataAPI", "Future"]
-git-tree-sha1 = "a193d6ad9c45ada72c14b731a318bedd3c2f00cf"
-uuid = "2dfb63ee-cc39-5dd5-95bd-886bf059d720"
-version = "1.3.0"
-
 [[Preferences]]
 deps = ["TOML"]
 git-tree-sha1 = "00cfd92944ca9c760982747e9a1d0d5d86ab1e5a"
 uuid = "21216c6a-2e73-6563-6e65-726566657250"
 version = "1.2.2"
-
-[[PrettyTables]]
-deps = ["Crayons", "Formatting", "Markdown", "Reexport", "Tables"]
-git-tree-sha1 = "d940010be611ee9d67064fe559edbb305f8cc0eb"
-uuid = "08abe8d2-0d0c-5749-adfa-8a2ac140af0d"
-version = "1.2.3"
 
 [[Printf]]
 deps = ["Unicode"]
@@ -1438,22 +1402,18 @@ version = "0.9.1+5"
 # ╟─e2b52309-9b20-4ee8-b22c-a10bbc01ce37
 # ╠═11861633-309d-4a19-bab0-88cc752fb6a5
 # ╠═5f5998fc-8954-4738-ab9e-54e5db821eb2
-# ╟─fae5f520-cd44-4595-b5b8-e87fe215d15d
+# ╠═fae5f520-cd44-4595-b5b8-e87fe215d15d
 # ╟─1f7c1317-10e9-4e3f-ba24-9fa337a5a4da
 # ╟─4caafd5b-f077-4238-b9a5-5b72d0b5f9ac
 # ╠═9f1001fc-f7cb-47e6-abc2-3c46d05d4ade
 # ╟─a647164f-8585-40bf-9036-729da288a0ca
 # ╠═bfc79861-8ca7-4aa0-b9a2-0e9e77c98be5
 # ╠═c7a54c8f-f68a-4f6f-ab33-0aff066f4542
-# ╟─05318f3b-2b49-4e73-b147-d4402cbc24f0
 # ╠═ae16d377-2f11-4b64-baa1-d1ad1f629b9b
-# ╠═06ba1279-2c12-45f9-88d8-cdcfd4000181
-# ╠═43174d96-c3aa-4349-9be3-6e3008c47ce2
-# ╠═0f288920-2f54-4391-965f-236afc8ffb2b
-# ╠═53c02a85-285f-447d-b188-9952dd8d2733
-# ╠═5645b874-5a0f-467a-9d6f-1b0d3fb382f1
+# ╟─06ba1279-2c12-45f9-88d8-cdcfd4000181
 # ╟─a4e41a9b-e396-42df-a9ef-04c9f7206cc9
 # ╠═7b833bca-d15e-46e2-a0c4-00ab9b28f178
+# ╟─05318f3b-2b49-4e73-b147-d4402cbc24f0
 # ╟─db4852fe-28f0-470d-b699-a824b77c3961
 # ╟─e8245df1-9ddf-4869-9748-d14d0af34cff
 # ╟─c7e05572-f25d-451f-a16d-7d23b95b57f3
@@ -1464,7 +1424,7 @@ version = "0.9.1+5"
 # ╠═b0fa3ca1-5755-49a7-8f2d-f6153bc2c081
 # ╟─90bbbba1-2293-4455-9892-d54c080f0f79
 # ╠═b3454e47-4c42-47ca-9336-497ecb3ce0e1
-# ╟─b43f46c7-8d60-40ba-a0e9-cc719a60252f
+# ╠═b43f46c7-8d60-40ba-a0e9-cc719a60252f
 # ╟─446c67d5-7639-4893-8202-f235f1d0585f
 # ╠═86e60e23-79b0-4dec-9623-105277c817dc
 # ╟─6a315e06-2479-4528-a7d4-bf28ce329dd8
