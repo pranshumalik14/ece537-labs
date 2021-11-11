@@ -49,37 +49,31 @@ where $$X_i$$ are i.i.d. random variables with pmf $$p_{X}(1) = p$$ and $$p_X(-1
 md"
 
 ### 1.1 Numerical Simulation
-We will test
+We will test <>
 
-𝑛₁ = $(@bind 𝑛₁ Slider(1:1:10000; show_value=true, default=50))
+𝑛 = $(@bind n Slider(1:1:1000; show_value=true, default=50))
 
-𝑝  = $(@bind 𝑝 Slider(0:0.001:1; show_value=true, default=0.5))
+𝑝  = $(@bind p Slider(0:0.001:1; show_value=true, default=0.5))
 
 "
 
 # ╔═╡ 9dc96d36-1c37-4951-a531-f099f4020913
-pmf = [1-𝑝, 0, 𝑝]; # for k = 1, 2, 3; therefore; need to location scale
+pmf = [1-p, 0, p]; # for k = 1, 2, 3. thus, need to shift location for k = -1, 0, 1
 
 # ╔═╡ bf4a3f81-c7ad-4c4b-8a4d-3792ea58807c
-𝑋(n) = [LocationScale(-2, 1, Categorical(pmf)) for n ∈ 1:n] # 𝑋 with pₓ(k-2) = pmf[k]
+𝑋(pmf, m) = [LocationScale(-2, 1, Categorical(pmf)) for k ∈ 1:m] # pₓ(k-2) = pmf[k]
 
 # ╔═╡ a1d36975-5696-4718-9876-114310503aba
-𝑋ᵢ = rand.(𝑋(𝑛₁));
+𝑋ᵢ = rand.(𝑋(pmf, n));
 
 # ╔═╡ bbb0a790-6a81-4707-8d07-51fe9cdbb3fb
-𝑍(𝑋ᵢ, n) = sum(𝑋ᵢ[1:n])
+𝑍(𝑋ᵢ, m) = sum(𝑋ᵢ[1:m])
 
 # ╔═╡ 5eeb448f-64dc-4afa-b8bc-dd15018d61e3
-𝑍ₙ = [𝑍(𝑋ᵢ, n) for n ∈ 1:𝑛₁]
+𝑍ₙ = [𝑍(𝑋ᵢ, k) for k ∈ 1:n]
 
 # ╔═╡ 8bd06fff-4ecf-451b-bba5-0f9c94b37869
-plot(1:𝑛₁, 𝑍ₙ; linetype=:steppost)
-
-# ╔═╡ 9a4f597d-2649-49c2-bad7-945b28b68a2e
-mean(𝑍ₙ)/𝑛₁
-
-# ╔═╡ 478ef58a-1fe6-4140-8399-3f8115d18f55
-var(𝑍ₙ; corrected=false)
+plot(𝑍ₙ[1:n]; linetype=:steppost)
 
 # ╔═╡ 30b00c83-89f2-4c4c-849a-d96bab90c488
 md"
@@ -89,6 +83,64 @@ md"
 Here we will test for a fixed number of samples, $N=100$, and observe the characteristics of the bivariate distributions and if they match our expectations.
 
 "
+
+# ╔═╡ f5d3b145-e85e-4f1a-9453-06d55240dd0f
+nfixed = 500;
+
+# ╔═╡ 599df2c2-50a0-4d61-8d35-0c3be46781a6
+N = 50;
+
+# ╔═╡ 96c2336f-befa-44df-9535-96b5f9785a37
+begin
+	p₁ = 0.5;
+	pmf₁ = [1-p₁, 0, p₁];
+	𝑋ᵢ₁ = [rand.(𝑋(pmf₁, nfixed)) for k ∈ 1:N];
+	𝑍ₙ₁ = [[𝑍(𝑋ᵢ₁[k], j) for j ∈ 1:nfixed] for k ∈ 1:N]; 𝑍ₙ₁ = hcat(𝑍ₙ₁...);
+end
+
+# ╔═╡ 4f65f016-60a9-4770-9b4d-bd8f12fee75a
+begin
+	as_svg(x) = PlutoUI.Show(MIME"image/svg+xml"(), repr(MIME"image/svg+xml"(), x))
+	fig₁ = plot();
+	for k ∈ 1:N plot!(1:nfixed, 𝑍ₙ₁[:, k]; linetype=:steppost, legend=false) end
+	as_svg(fig₁)
+end
+
+# ╔═╡ d0a607fb-bf7f-4e5e-98b2-c967b475d3db
+plot(1:nfixed, mean(𝑍ₙ₁; dims=2))
+
+# ╔═╡ 49174e6d-0dcb-4b79-b589-49de7b4b2021
+plot(1:nfixed, var(𝑍ₙ₁; dims=2))
+
+# ╔═╡ 335adb69-1436-4964-acea-0327d125d473
+begin
+	p₂ = 0.4;
+	pmf₂ = [1-p₂, 0, p₂];
+end
+
+# ╔═╡ 35b7a303-e78d-45c5-90de-9e92d47ce4d4
+begin
+	𝑋ᵢ₂ = [rand.(𝑋(pmf₂, nfixed)) for k ∈ 1:N];
+	𝑍ₙ₂ = [[𝑍(𝑋ᵢ₂[k], j) for j ∈ 1:nfixed] for k ∈ 1:N]; 𝑍ₙ₂ = hcat(𝑍ₙ₂...);
+	fig₂ = plot();
+	for k ∈ 1:N plot!(1:nfixed, 𝑍ₙ₂[:, k]; linetype=:steppost, legend=false) end
+	as_svg(fig₂)
+end
+
+# ╔═╡ 046df611-d8f8-420a-83f7-f6e41e20cd47
+begin
+	p₃ = 0.6;
+	pmf₃ = [1-p₃, 0, p₃];
+end
+
+# ╔═╡ 5224a688-49f6-4828-af23-11e9fa2a6881
+begin
+	𝑋ᵢ₃ = [rand.(𝑋(pmf₃, nfixed)) for k ∈ 1:N];
+	𝑍ₙ₃ = [[𝑍(𝑋ᵢ₃[k], j) for j ∈ 1:nfixed] for k ∈ 1:N]; 𝑍ₙ₃ = hcat(𝑍ₙ₃...);
+	fig₃ = plot();
+	for k ∈ 1:N plot!(1:nfixed, 𝑍ₙ₃[:, k]; linetype=:steppost, legend=false) end
+	as_svg(fig₃)
+end
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
@@ -1211,8 +1263,16 @@ version = "0.9.1+5"
 # ╠═bbb0a790-6a81-4707-8d07-51fe9cdbb3fb
 # ╠═5eeb448f-64dc-4afa-b8bc-dd15018d61e3
 # ╠═8bd06fff-4ecf-451b-bba5-0f9c94b37869
-# ╠═9a4f597d-2649-49c2-bad7-945b28b68a2e
-# ╠═478ef58a-1fe6-4140-8399-3f8115d18f55
 # ╟─30b00c83-89f2-4c4c-849a-d96bab90c488
+# ╠═f5d3b145-e85e-4f1a-9453-06d55240dd0f
+# ╠═599df2c2-50a0-4d61-8d35-0c3be46781a6
+# ╠═96c2336f-befa-44df-9535-96b5f9785a37
+# ╟─4f65f016-60a9-4770-9b4d-bd8f12fee75a
+# ╠═d0a607fb-bf7f-4e5e-98b2-c967b475d3db
+# ╠═49174e6d-0dcb-4b79-b589-49de7b4b2021
+# ╠═335adb69-1436-4964-acea-0327d125d473
+# ╟─35b7a303-e78d-45c5-90de-9e92d47ce4d4
+# ╠═046df611-d8f8-420a-83f7-f6e41e20cd47
+# ╟─5224a688-49f6-4828-af23-11e9fa2a6881
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
