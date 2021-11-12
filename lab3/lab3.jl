@@ -41,7 +41,7 @@ A discrete random walk process, $$Z(n)$$ is given by,
 
 $$Z(n) = \displaystyle\sum_{i=1}^{n}X_i \text{ },$$
 
-where $$X_i$$ are i.i.d. random variables with pmf $$p_{X}(1) = p$$ and $$p_X(-1) = 1-p$$. $$\color{red}{\text{insert info about mean and variance}}$$
+where $$X_i$$ are i.i.d. random variables with pmf $$p_{X}(1) = p$$ and $$p_X(-1) = 1-p$$ Can be expressed as $$2\text{Bernoulli}(p)-1$$, but we will use Categorical. $$\color{red}{\text{insert info about mean and variance}}$$
 
 "
 
@@ -101,16 +101,16 @@ end
 # ╔═╡ 4f65f016-60a9-4770-9b4d-bd8f12fee75a
 begin
 	as_svg(x) = PlutoUI.Show(MIME"image/svg+xml"(), repr(MIME"image/svg+xml"(), x))
-	fig₁ = plot();
+	fig₁ = plot(; xlims=(0, nfixed+1));
 	for k ∈ 1:N plot!(1:nfixed, 𝑍ₙ₁[:, k]; linetype=:steppost, legend=false) end
 	as_svg(fig₁)
 end
 
 # ╔═╡ d0a607fb-bf7f-4e5e-98b2-c967b475d3db
-plot(1:nfixed, mean(𝑍ₙ₁; dims=2))
+plot(1:nfixed, mean(𝑍ₙ₁; dims=2); xlims=(0, nfixed+1))
 
 # ╔═╡ 49174e6d-0dcb-4b79-b589-49de7b4b2021
-plot(1:nfixed, var(𝑍ₙ₁; dims=2))
+plot(1:nfixed, var(𝑍ₙ₁; dims=2); xlims=(0, nfixed+1))
 
 # ╔═╡ 335adb69-1436-4964-acea-0327d125d473
 begin
@@ -122,7 +122,7 @@ end
 begin
 	𝑋ᵢ₂ = [rand.(𝑋(pmf₂, nfixed)) for k ∈ 1:N];
 	𝑍ₙ₂ = [[𝑍(𝑋ᵢ₂[k], j) for j ∈ 1:nfixed] for k ∈ 1:N]; 𝑍ₙ₂ = hcat(𝑍ₙ₂...);
-	fig₂ = plot();
+	fig₂ = plot(; xlims=(0, nfixed+1));
 	for k ∈ 1:N plot!(1:nfixed, 𝑍ₙ₂[:, k]; linetype=:steppost, legend=false) end
 	as_svg(fig₂)
 end
@@ -137,10 +137,100 @@ end
 begin
 	𝑋ᵢ₃ = [rand.(𝑋(pmf₃, nfixed)) for k ∈ 1:N];
 	𝑍ₙ₃ = [[𝑍(𝑋ᵢ₃[k], j) for j ∈ 1:nfixed] for k ∈ 1:N]; 𝑍ₙ₃ = hcat(𝑍ₙ₃...);
-	fig₃ = plot();
+	fig₃ = plot(; xlims=(0, nfixed+1));
 	for k ∈ 1:N plot!(1:nfixed, 𝑍ₙ₃[:, k]; linetype=:steppost, legend=false) end
 	as_svg(fig₃)
 end
+
+# ╔═╡ 32891d70-c0da-400e-94dd-87eee99a13b0
+md"
+
+## 2. Simulating a Poisson Random Process
+
+This process is very nice.
+
+$$N(t) = \sum_{i=1}^{\infty}I(X_1 + \cdots + X_i < t) \text{ },$$
+
+where, $$I(P)$$ is an identifier function is defined as,
+
+$$I(P) = 
+\begin{cases}
+	1 & \text{if predicate } P \text{ is true}\\
+	0 & \text{if predicate } P \text{ is false}
+\end{cases}$$
+
+Essentially, this sum calculates the length of events happening before time $$t$$.
+
+"
+
+# ╔═╡ b5f425b0-a395-44fc-ab26-96983fcc33db
+md"
+
+### 2.1 Numerical Simulation
+
+λ = $(@bind λ Slider(0.05:0.01:4; show_value=true, default=2))
+
+t = $(@bind t Slider(0:0.01:10; show_value=true, default=5))
+
+"
+
+# ╔═╡ 5b1ee65d-1375-497e-9510-0c6dc7d261be
+Nₑₓₚ = 100;
+
+# ╔═╡ 7a958927-d2fd-4685-9930-cc42a3bfa578
+𝐸(λ, n) = [Exponential(1/λ) for k ∈ 1:n];
+
+# ╔═╡ 053e986d-0872-4883-8f31-e8fc736d6a9c
+𝑋ₑₓₚ = rand.(𝐸(λ, Nₑₓₚ))
+
+# ╔═╡ 144528b8-dd4e-40b6-a900-5aac59893fb9
+𝑁(𝑋ₑₓₚ, t) = (cumsum(𝑋ₑₓₚ) .< t) |> sum
+
+# ╔═╡ 32abc18b-9655-43b2-8dae-b2737cd971e8
+let
+	ts = 0:0.01:t;
+	𝑁ₑₓₚ(t) = 𝑁(𝑋ₑₓₚ, t);
+	plot(ts, 𝑁ₑₓₚ.(ts); linetype=:steppost, legend=false)
+	vline!(cumsum(𝑋ₑₓₚ); xlims=(0, t), linestyle=:dashdot)
+end
+
+# ╔═╡ 11a6cb10-fe44-48e9-aa58-43ff79791a9d
+md"
+
+### 2.2 Summary of Results
+
+Let the exponentials have $$\lambda = 2$$ seconds and let $$t = 5$$ seconds.
+
+"
+
+# ╔═╡ c6add09a-f39e-44e2-97ee-05be9342214b
+Nsamples = 1000;
+
+# ╔═╡ 36d6cddb-af71-48bd-a8a3-fbb5312f903f
+λfixed = 2;
+
+# ╔═╡ 6327a54c-0c11-4af5-9d71-6023fc6dab05
+tfixed = 5;
+
+# ╔═╡ 7c87ad33-e0c1-4fd4-99a5-0787fe6fedab
+𝑁samples = [𝑁(rand.(𝐸(λfixed, Nₑₓₚ)), tfixed) for n ∈ 1:Nsamples]
+
+# ╔═╡ 67068f89-fed7-4730-a0c8-3b98c6f5760b
+𝑁hist = fit(Histogram, 𝑁samples, nbins=10);
+
+# ╔═╡ e3ffc814-e220-49bc-bd31-5104f6114685
+let
+	normalhist = normalize(𝑁hist; mode=:pdf)
+	plot(normalhist; legend=false, xlims=(minimum(𝑁samples),maximum(𝑁samples)))
+	plot!(minimum(𝑁samples):maximum(𝑁samples), Poisson(λfixed*tfixed); 
+		color="orange", linewidth=5)
+end
+
+# ╔═╡ 17aa79f5-cc68-43be-82c1-432ba754c440
+mean(𝑁samples) # used in fir Poisson: very close to 10!
+
+# ╔═╡ 521e2295-b07e-4671-b656-a8a5eaa6be51
+var(𝑁samples; corrected=false)
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
@@ -1268,11 +1358,27 @@ version = "0.9.1+5"
 # ╠═599df2c2-50a0-4d61-8d35-0c3be46781a6
 # ╠═96c2336f-befa-44df-9535-96b5f9785a37
 # ╟─4f65f016-60a9-4770-9b4d-bd8f12fee75a
-# ╠═d0a607fb-bf7f-4e5e-98b2-c967b475d3db
-# ╠═49174e6d-0dcb-4b79-b589-49de7b4b2021
+# ╟─d0a607fb-bf7f-4e5e-98b2-c967b475d3db
+# ╟─49174e6d-0dcb-4b79-b589-49de7b4b2021
 # ╠═335adb69-1436-4964-acea-0327d125d473
 # ╟─35b7a303-e78d-45c5-90de-9e92d47ce4d4
 # ╠═046df611-d8f8-420a-83f7-f6e41e20cd47
 # ╟─5224a688-49f6-4828-af23-11e9fa2a6881
+# ╟─32891d70-c0da-400e-94dd-87eee99a13b0
+# ╟─b5f425b0-a395-44fc-ab26-96983fcc33db
+# ╠═5b1ee65d-1375-497e-9510-0c6dc7d261be
+# ╠═7a958927-d2fd-4685-9930-cc42a3bfa578
+# ╠═053e986d-0872-4883-8f31-e8fc736d6a9c
+# ╠═144528b8-dd4e-40b6-a900-5aac59893fb9
+# ╠═32abc18b-9655-43b2-8dae-b2737cd971e8
+# ╟─11a6cb10-fe44-48e9-aa58-43ff79791a9d
+# ╠═c6add09a-f39e-44e2-97ee-05be9342214b
+# ╠═36d6cddb-af71-48bd-a8a3-fbb5312f903f
+# ╠═6327a54c-0c11-4af5-9d71-6023fc6dab05
+# ╠═7c87ad33-e0c1-4fd4-99a5-0787fe6fedab
+# ╠═67068f89-fed7-4730-a0c8-3b98c6f5760b
+# ╟─e3ffc814-e220-49bc-bd31-5104f6114685
+# ╠═17aa79f5-cc68-43be-82c1-432ba754c440
+# ╠═521e2295-b07e-4671-b656-a8a5eaa6be51
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
