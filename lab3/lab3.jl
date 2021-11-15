@@ -179,7 +179,7 @@ md"
 
 Note from the plots above that, as anticipated for $$p=0.5$$, $$\mu_Z(n)$$ remains close to $$0$$. Especially for a higher number of traces, we would expect the trend to be further flattened to $$0$$ as a better approximation. The variance, $$\sigma^2_Z(n)$$, also as anticipated for $$p=0.5$$, almost follows a linear trend with $$\sigma^2_Z(500) \approx 500$$. This matches the observation from the traces above that the variance increases with the number of steps even when the process has zero mean, and it also matches our intuition; if we take an increasing number of such unbiased steps, we would expect ourselves to be within a ballpark of an increasing bound even though the mean is logically zero.
 
-$$\color{red}{\text{stationarity of the process}}$$.
+Furthermore, note that the discrete random process above is not strictly stationary since $$\text{VAR}[Z(n)] = \text{VAR}[X_1 + \cdots + X_n] = n \neq \text{VAR}[Z(n-k)]$$ for $$k \neq 0$$, even though $$E[Z(n)] = E[Z(n-k)] = 0$$. So any two points can not have the same distribution in this process, meaning non-stationarity. Also, intuitively, the distribution changes over time because the variance increases, hence the random walk process should (at least in the strong sense) not be stationary.
 
 "
 
