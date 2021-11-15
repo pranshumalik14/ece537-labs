@@ -61,7 +61,7 @@ We will test <>
 pmf = [1-p, 0, p]; # for k = 1, 2, 3. thus, need to shift location for k = -1, 0, 1
 
 # ╔═╡ bf4a3f81-c7ad-4c4b-8a4d-3792ea58807c
-𝑋(pmf, m) = [LocationScale(-2, 1, Categorical(pmf)) for k ∈ 1:m] # pₓ(k-2) = pmf[k]
+𝑋(pmf, m) = [LocationScale(-2, 1, Categorical(pmf)) for k ∈ 1:m] # pₓ(1*k-2) = pmf[k]
 
 # ╔═╡ a1d36975-5696-4718-9876-114310503aba
 𝑋ᵢ = rand.(𝑋(pmf, n));
@@ -175,7 +175,7 @@ t = $(@bind t Slider(0:0.01:10; show_value=true, default=5))
 "
 
 # ╔═╡ 5b1ee65d-1375-497e-9510-0c6dc7d261be
-Nₑₓₚ = 100;
+Nₑₓₚ = 100; # large enough to almost definitely span the range of t
 
 # ╔═╡ 7a958927-d2fd-4685-9930-cc42a3bfa578
 𝐸(λ, n) = [Exponential(1/λ) for k ∈ 1:n];
@@ -203,14 +203,38 @@ Let the exponentials have $$\lambda = 2$$ seconds and let $$t = 5$$ seconds.
 
 "
 
-# ╔═╡ c6add09a-f39e-44e2-97ee-05be9342214b
-Nsamples = 1000;
-
 # ╔═╡ 36d6cddb-af71-48bd-a8a3-fbb5312f903f
 λfixed = 2;
 
 # ╔═╡ 6327a54c-0c11-4af5-9d71-6023fc6dab05
 tfixed = 5;
+
+# ╔═╡ d35830f5-b68c-4ec6-9d37-cb38c446eeef
+md"
+
+Plotting $$5$$ independent traces of the process, $$N(t)$$:
+
+"
+
+# ╔═╡ 2437dcd8-f78b-419f-a0f1-7365fa2186b7
+Ntraces = 5;
+
+# ╔═╡ 01f79750-3b10-4d55-a30b-d7534d7e13af
+begin
+	ts = 0:0.01:tfixed;
+	𝑋ₑₓₚᵢ        = [rand.(𝐸(λfixed, Nₑₓₚ)) for k ∈ 1:Ntraces];
+	𝑁ₑₓₚᵢ(ts, k) = [𝑁(𝑋ₑₓₚᵢ[k], t) for t ∈ ts];	
+end
+
+# ╔═╡ ca493590-4856-4aad-b0cf-c8ee702fe74a
+let
+	fig = plot(; xlims=(0, tfixed), legend=:topleft);
+	for k ∈ 1:Ntraces plot!(ts, 𝑁ₑₓₚᵢ(ts, k); linetype=:steppost, label="Trace $k") end
+	as_svg(fig)
+end
+
+# ╔═╡ c6add09a-f39e-44e2-97ee-05be9342214b
+Nsamples = 1000; # number of samples of the random variable 𝑁(t=tfixed; λ=λfixed)
 
 # ╔═╡ 7c87ad33-e0c1-4fd4-99a5-0787fe6fedab
 𝑁samples = [𝑁(rand.(𝐸(λfixed, Nₑₓₚ)), tfixed) for n ∈ 1:Nsamples]
@@ -227,7 +251,7 @@ let
 end
 
 # ╔═╡ 17aa79f5-cc68-43be-82c1-432ba754c440
-mean(𝑁samples) # used in fir Poisson: very close to 10!
+mean(𝑁samples) # used in fit Poisson: very close to 10!
 
 # ╔═╡ 521e2295-b07e-4671-b656-a8a5eaa6be51
 var(𝑁samples; corrected=false)
@@ -1372,9 +1396,13 @@ version = "0.9.1+5"
 # ╠═144528b8-dd4e-40b6-a900-5aac59893fb9
 # ╟─32abc18b-9655-43b2-8dae-b2737cd971e8
 # ╟─11a6cb10-fe44-48e9-aa58-43ff79791a9d
-# ╠═c6add09a-f39e-44e2-97ee-05be9342214b
 # ╠═36d6cddb-af71-48bd-a8a3-fbb5312f903f
 # ╠═6327a54c-0c11-4af5-9d71-6023fc6dab05
+# ╟─d35830f5-b68c-4ec6-9d37-cb38c446eeef
+# ╠═2437dcd8-f78b-419f-a0f1-7365fa2186b7
+# ╠═01f79750-3b10-4d55-a30b-d7534d7e13af
+# ╟─ca493590-4856-4aad-b0cf-c8ee702fe74a
+# ╠═c6add09a-f39e-44e2-97ee-05be9342214b
 # ╠═7c87ad33-e0c1-4fd4-99a5-0787fe6fedab
 # ╠═67068f89-fed7-4730-a0c8-3b98c6f5760b
 # ╟─e3ffc814-e220-49bc-bd31-5104f6114685
