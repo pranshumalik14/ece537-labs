@@ -26,7 +26,7 @@ md"
 # ECE537: Lab 3 Report
 > _It is recommended to access this report by opening the `html` file on the browser or by clicking [here](https://pranshumalik14.github.io/ece537-labs/lab3/lab3.jl.html)_.
 
-In the first part of the lab, we will be.
+In the first part of the lab, we will be simulating a discrete random walk process and will analyze the stationarity of the process and the effects of bias in step directions. In the second part, we will simulate a Poisson point process and will compare the results (estimates) for the distribution parameters with the theoretical values.
 
 Throughout this lab, the [Distributions.jl](https://github.com/JuliaStats/Distributions.jl) package in Julia has been utilized to be able to use the probability constructs in code.
 
@@ -41,7 +41,15 @@ A discrete random walk process, $$Z(n)$$ is given by,
 
 $$Z(n) = \displaystyle\sum_{i=1}^{n}X_i \text{ },$$
 
-where $$X_i$$ are i.i.d. random variables with pmf $$p_{X}(1) = p$$ and $$p_X(-1) = 1-p$$ Can be expressed as $$2\text{Bernoulli}(p)-1$$, but we will use Categorical. $$\color{red}{\text{insert info about mean and variance}}$$
+where $$X_i$$ are i.i.d. random variables with pmf $$p_{X}(1) = p$$ and $$p_X(-1) = 1-p$$. The pmf for $$X_i$$ can either be expressed as the transformation $$2B-1$$, where $$B \sim \text{Bernoulli}(p)$$, or as a location-shifted Categorical distribution with a prescribed pmf array, $\mathbf{p}$, such that $$\mathbf{p}[k] = p_{X}(k-k_0)$$. In code, we have used the latter.
+
+Note that the mean of a discrete random walk process is given by,
+
+$$\mu_{Z}(n) = n(2p - 1).$$
+
+And the variance of a discrete random walk process is given by,
+
+$$\sigma^2_{Z}(n) = 4np(1-p).$$
 
 "
 
@@ -49,11 +57,19 @@ where $$X_i$$ are i.i.d. random variables with pmf $$p_{X}(1) = p$$ and $$p_X(-1
 md"
 
 ### 1.1 Numerical Simulation
-We will test <>
+
+We will now create a simple interactive demo of a random walk process over $$n$$ steps with the probability of progressing forward $$p$$.
 
 𝑛 = $(@bind n Slider(1:1:1000; show_value=true, default=50))
 
 𝑝  = $(@bind p Slider(0:0.001:1; show_value=true, default=0.5))
+
+"
+
+# ╔═╡ 0e224562-0fd6-44c1-985b-81e5cf19fc5a
+md"
+
+We first begin by defining the pmf for the i.i.d. random process, and then creating a realization of the process by taking one instance (or sample) of each random step.
 
 "
 
@@ -66,6 +82,13 @@ pmf = [1-p, 0, p]; # for k = 1, 2, 3. thus, need to shift location for k = -1, 0
 # ╔═╡ a1d36975-5696-4718-9876-114310503aba
 𝑋ᵢ = rand.(𝑋(pmf, n));
 
+# ╔═╡ 51460ab4-4538-48d6-8093-3aeacdb99cd7
+md"
+
+We then define the process $$Z(n)$$, evaluate it for the given realization, and then plot the sample path or trace.
+
+"
+
 # ╔═╡ bbb0a790-6a81-4707-8d07-51fe9cdbb3fb
 𝑍(𝑋ᵢ, m) = sum(𝑋ᵢ[1:m])
 
@@ -73,14 +96,26 @@ pmf = [1-p, 0, p]; # for k = 1, 2, 3. thus, need to shift location for k = -1, 0
 𝑍ₙ = [𝑍(𝑋ᵢ, k) for k ∈ 1:n]
 
 # ╔═╡ 8bd06fff-4ecf-451b-bba5-0f9c94b37869
-plot(𝑍ₙ[1:n]; linetype=:steppost)
+begin
+	plot(𝑍ₙ[1:n]; linetype=:steppost, legend=false)
+	xlabel!(L"n")
+	ylabel!(L"Z(n)")
+	title!("Sample Trace of Z(n)")
+end
+
+# ╔═╡ 5a4354f0-86f9-42e4-a657-809329b87608
+md"
+
+We can observe, especially for a higher number of steps, that the traces resemble uniform discrete Brownian (or red) noise!
+
+"
 
 # ╔═╡ 30b00c83-89f2-4c4c-849a-d96bab90c488
 md"
 
 ### 1.2 Summary of Results
 
-Here we will test for a fixed number of samples, $N=100$, and observe the characteristics of the bivariate distributions and if they match our expectations.
+Here we will compile the results over a fixed number of steps, $$n=500$$, and estimate the mean and variance of the random process over $$N=50$$ traces. We will then also visualize the effect of varying $$p$$.
 
 "
 
@@ -89,6 +124,13 @@ nfixed = 500;
 
 # ╔═╡ 599df2c2-50a0-4d61-8d35-0c3be46781a6
 N = 50;
+
+# ╔═╡ dd0212b9-ff19-4e33-b28f-49e55707c087
+md"
+
+Below is a matrix where each column represents independent realizations (or traces) of the discrete random walk process, $$Z(n)$$, over the fixed number of steps. Notice in the plot below that the \"spread\", or the variance, of the process is getting larger as the number of steps increases.
+
+"
 
 # ╔═╡ 96c2336f-befa-44df-9535-96b5f9785a37
 begin
@@ -103,29 +145,52 @@ begin
 	as_svg(x) = PlutoUI.Show(MIME"image/svg+xml"(), repr(MIME"image/svg+xml"(), x))
 	fig₁ = plot(; xlims=(0, nfixed+1));
 	for k ∈ 1:N plot!(1:nfixed, 𝑍ₙ₁[:, k]; linetype=:steppost, legend=false) end
+	xlabel!(L"n")
+	ylabel!(L"Z(n)")
+	title!("Sample Traces of Z(n; p=0.5)")
 	as_svg(fig₁)
 end
 
+# ╔═╡ a2da758f-50d8-4b66-b29a-2616f1b6cdc8
+md"
+
+We can estaimte the expected value of each index $$Z(k)$$, which is a random variable, by averaging over all the traces. Similarly, we can also estimate the variance. Both have been plotted below.
+
+"
+
 # ╔═╡ d0a607fb-bf7f-4e5e-98b2-c967b475d3db
-plot(1:nfixed, mean(𝑍ₙ₁; dims=2); xlims=(0, nfixed+1))
+begin
+	plot(1:nfixed, mean(𝑍ₙ₁; dims=2); xlims=(0, nfixed+1), legend=false)
+	xlabel!(L"n")
+	ylabel!(L"\mu_Z(n)")
+	title!("Estimated Mean of Z(n; p=0.5)")
+end
 
 # ╔═╡ 49174e6d-0dcb-4b79-b589-49de7b4b2021
-plot(1:nfixed, var(𝑍ₙ₁; dims=2); xlims=(0, nfixed+1))
-
-# ╔═╡ 335adb69-1436-4964-acea-0327d125d473
 begin
-	p₂ = 0.4;
-	pmf₂ = [1-p₂, 0, p₂];
+	plot(1:nfixed, var(𝑍ₙ₁; dims=2); xlims=(0, nfixed+1), legend=false)
+	xlabel!(L"n")
+	ylabel!(L"\sigma^2_Z(n)")
+	title!("Estimated variance of Z(n; p=0.5)")
 end
 
-# ╔═╡ 35b7a303-e78d-45c5-90de-9e92d47ce4d4
-begin
-	𝑋ᵢ₂ = [rand.(𝑋(pmf₂, nfixed)) for k ∈ 1:N];
-	𝑍ₙ₂ = [[𝑍(𝑋ᵢ₂[k], j) for j ∈ 1:nfixed] for k ∈ 1:N]; 𝑍ₙ₂ = hcat(𝑍ₙ₂...);
-	fig₂ = plot(; xlims=(0, nfixed+1));
-	for k ∈ 1:N plot!(1:nfixed, 𝑍ₙ₂[:, k]; linetype=:steppost, legend=false) end
-	as_svg(fig₂)
-end
+# ╔═╡ 87ef5096-888d-4ec7-9868-011ffb16110c
+md"
+
+Note from the plots above that, as anticipated for $$p=0.5$$, $$\mu_Z(n)$$ remains close to $$0$$. Especially for a higher number of traces, we would expect the trend to be further flattened to $$0$$ as a better approximation. The variance, $$\sigma^2_Z(n)$$, also as anticipated for $$p=0.5$$, almost follows a linear trend with $$\sigma^2_Z(500) \approx 500$$. This matches the observation from the traces above that the variance increases with the number of steps even when the process has zero mean, and it also matches our intuition; if we take an increasing number of such unbiased steps, we would expect ourselves to be within a ballpark of an increasing bound even though the mean is logically zero.
+
+$$\color{red}{\text{stationarity of the process}}$$.
+
+"
+
+# ╔═╡ d285bccb-9eac-4d1d-b5b6-ddd45dcad597
+md"
+
+We will now observe the effects of varying $$p$$ to add bias to the general direction of movement of the random process.
+
+We first, let $$p=0.6$$ and plot the results of $$50$$ traces below.
+
+"
 
 # ╔═╡ 046df611-d8f8-420a-83f7-f6e41e20cd47
 begin
@@ -139,19 +204,54 @@ begin
 	𝑍ₙ₃ = [[𝑍(𝑋ᵢ₃[k], j) for j ∈ 1:nfixed] for k ∈ 1:N]; 𝑍ₙ₃ = hcat(𝑍ₙ₃...);
 	fig₃ = plot(; xlims=(0, nfixed+1));
 	for k ∈ 1:N plot!(1:nfixed, 𝑍ₙ₃[:, k]; linetype=:steppost, legend=false) end
+	xlabel!(L"n")
+	ylabel!(L"Z(n)")
+	title!("Sample Traces of Z(n; p=0.6)")
 	as_svg(fig₃)
 end
+
+# ╔═╡ 2d61141d-45b0-4afb-ae90-ad5f2341d739
+md"
+
+As expected, we see a linearly upwards trend with an increasing spread. However, we would expect this spread to decrease as steps become more deterministic in nature with increasing values of $$p$$, thereby resulting in almost straight line traces or paths with little deviation. The same goes for $$p=0.4$$, where, instead, we see a linearly downwards trend because of being more likely to take a step backward instead of forward. The sample traces for this case are shown below.
+
+"
+
+# ╔═╡ 335adb69-1436-4964-acea-0327d125d473
+begin
+	p₂ = 0.4;
+	pmf₂ = [1-p₂, 0, p₂];
+end
+
+# ╔═╡ 35b7a303-e78d-45c5-90de-9e92d47ce4d4
+begin
+	𝑋ᵢ₂ = [rand.(𝑋(pmf₂, nfixed)) for k ∈ 1:N];
+	𝑍ₙ₂ = [[𝑍(𝑋ᵢ₂[k], j) for j ∈ 1:nfixed] for k ∈ 1:N]; 𝑍ₙ₂ = hcat(𝑍ₙ₂...);
+	fig₂ = plot(; xlims=(0, nfixed+1));
+	for k ∈ 1:N plot!(1:nfixed, 𝑍ₙ₂[:, k]; linetype=:steppost, legend=false) end
+	xlabel!(L"n")
+	ylabel!(L"Z(n)")
+	title!("Sample Traces of Z(n; p=0.4)")
+	as_svg(fig₂)
+end
+
+# ╔═╡ 6e77f1f8-5837-40e5-8903-7fa70944a323
+md"
+
+Note that both cases above appear to follow the theoretical linear trend of $$\mu_Z(n)$$.
+
+"
 
 # ╔═╡ 32891d70-c0da-400e-94dd-87eee99a13b0
 md"
 
 ## 2. Simulating a Poisson Random Process
 
-This process is very nice.
+The Poisson random process is a continuous-time discrete-state process that can be interpreted as counting the number of events that have happened by time $$t$$, where successive events have exponential i.i.d. inter-occurrence times. Let this counting process be called $$N(t)$$, which can be succinctly expressed as,
 
 $$N(t) = \sum_{i=1}^{\infty}I(X_1 + \cdots + X_i < t) \text{ },$$
 
-where, $$I(P)$$ is an identifier function is defined as,
+where, $$I(P)$$ is an identifier function defined to be,
 
 $$I(P) = 
 \begin{cases}
@@ -159,7 +259,9 @@ $$I(P) =
 	0 & \text{if predicate } P \text{ is false}
 \end{cases}$$
 
-Essentially, this sum calculates the length of events happening before time $$t$$.
+Essentially, this sum calculates the number of events that have happened before time $$t$$ by comparing it to the accumulation of inter-occurrence times.
+
+Note that the resulting process will be Poisson distributed with parameter $$\lambda t$$, i.e. $$N(t) \sim \text{Pois}(\lambda t)$$, where the i.i.d. inter-occurrence times $$X_i \sim \text{Exp}(\lambda)$$. We will also verify this numerically from the simulations.
 
 "
 
@@ -168,9 +270,13 @@ md"
 
 ### 2.1 Numerical Simulation
 
+The infinite sum is impractical to carry out. Therefore, to simulate such a process in code, we can consider a \"large enough\" sequence of i.i.d. exponential random variables that we should expect to cumulatively amount to more than the maximum value of $$t$$ in consideration. Here we have chosen the number of exponentials to be $$N_{\text{exp}} = 100$$, and for all trials run so far, this has been sufficient.
+
 λ = $(@bind λ Slider(0.05:0.01:4; show_value=true, default=2))
 
 t = $(@bind t Slider(0:0.01:10; show_value=true, default=5))
+
+Similar to section 1.1, we now sample a realization of the random process and plot the trace. Note that the vertical lines are the point of occurrence of one event which are the cause of the jump in the value of $$N(t)$$.
 
 "
 
@@ -192,6 +298,9 @@ let
 	𝑁ₑₓₚ(t) = 𝑁(𝑋ₑₓₚ, t);
 	plot(ts, 𝑁ₑₓₚ.(ts); linetype=:steppost, legend=false)
 	vline!(cumsum(𝑋ₑₓₚ); xlims=(0, t), linestyle=:dashdot)
+	xlabel!(L"t")
+	ylabel!(L"N(t)")
+	title!("Sample Trace of N(t)")
 end
 
 # ╔═╡ 11a6cb10-fe44-48e9-aa58-43ff79791a9d
@@ -199,7 +308,7 @@ md"
 
 ### 2.2 Summary of Results
 
-Let the exponentials have $$\lambda = 2$$ seconds and let $$t = 5$$ seconds.
+We begin by utilizing the code above to plot $$N = 5$$ independent traces of $$N(t)$$. We fix $$\lambda = 2$$ seconds and consider $$t \in [0,5]$$ seconds.
 
 "
 
@@ -208,13 +317,6 @@ Let the exponentials have $$\lambda = 2$$ seconds and let $$t = 5$$ seconds.
 
 # ╔═╡ 6327a54c-0c11-4af5-9d71-6023fc6dab05
 tfixed = 5;
-
-# ╔═╡ d35830f5-b68c-4ec6-9d37-cb38c446eeef
-md"
-
-Plotting $$5$$ independent traces of the process, $$N(t)$$:
-
-"
 
 # ╔═╡ 2437dcd8-f78b-419f-a0f1-7365fa2186b7
 Ntraces = 5;
@@ -230,8 +332,20 @@ end
 let
 	fig = plot(; xlims=(0, tfixed), legend=:topleft);
 	for k ∈ 1:Ntraces plot!(ts, 𝑁ₑₓₚᵢ(ts, k); linetype=:steppost, label="Trace $k") end
+	xlabel!(L"t")
+	ylabel!(L"N(t)")
+	title!("Sample Traces of N(t)")
 	as_svg(fig)
 end
+
+# ╔═╡ 773f3396-cd33-4e4c-8adf-7812778e31e1
+md"
+
+We now verify if the simulations are accurate by comparing the numerical estimate of the statistics of the distribution to their theoretical values. We know that $$N(t) \sim \text{Pois}(\lambda t)$$, for which both $$\mu_N(t) = \sigma^2_N(t) = \lambda t$$. We continue with our choice of $$t=5$$ and $$\lambda = 2$$ and sample the random variable, $$N(5)$$, $$1000$$ times to compare with the theoretical mean and variance, either of which is a sufficient statistic for characterizing the underlying Possion distribution. Note that we should expect $$N(t)$$ to have the pmf, 
+
+$$p_N(k; \lambda, t) = \frac{(\lambda t)^k}{k!}e^{-\lambda t}$$
+
+"
 
 # ╔═╡ c6add09a-f39e-44e2-97ee-05be9342214b
 Nsamples = 1000; # number of samples of the random variable 𝑁(t=tfixed; λ=λfixed)
@@ -245,16 +359,26 @@ Nsamples = 1000; # number of samples of the random variable 𝑁(t=tfixed; λ=λ
 # ╔═╡ e3ffc814-e220-49bc-bd31-5104f6114685
 let
 	normalhist = normalize(𝑁hist; mode=:pdf)
-	plot(normalhist; legend=false, xlims=(minimum(𝑁samples),maximum(𝑁samples)))
+	plot(normalhist; label="Empirical Histogram", xlims=(minimum(𝑁samples),maximum(𝑁samples)))
 	plot!(minimum(𝑁samples):maximum(𝑁samples), Poisson(λfixed*tfixed); 
-		color="orange", linewidth=5)
+		color="orange", linewidth=5, label="Theoretical pmf")
+	xlabel!(L"N(5)")
+	ylabel!("Normalized Density")
+	title!("Normalized Histogram of N(5) over 1000 samples")
 end
 
 # ╔═╡ 17aa79f5-cc68-43be-82c1-432ba754c440
-mean(𝑁samples) # used in fit Poisson: very close to 10!
+mean(𝑁samples)
 
 # ╔═╡ 521e2295-b07e-4671-b656-a8a5eaa6be51
 var(𝑁samples; corrected=false)
+
+# ╔═╡ f26fb00b-49f3-4495-b243-e6c2dab8954d
+md"
+
+Note that both values are close to $$\lambda t = 10$$ which verifies that the simulation is accurate.
+
+"
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
@@ -1371,23 +1495,32 @@ version = "0.9.1+5"
 # ╠═328c0366-58a8-40fd-b9b7-30bf72ffcbf5
 # ╟─bf3af91d-7171-418d-bfd8-317b17c21502
 # ╟─f1d51c08-d771-492f-a5ef-ce134101dad1
+# ╟─0e224562-0fd6-44c1-985b-81e5cf19fc5a
 # ╠═9dc96d36-1c37-4951-a531-f099f4020913
 # ╠═bf4a3f81-c7ad-4c4b-8a4d-3792ea58807c
 # ╠═a1d36975-5696-4718-9876-114310503aba
+# ╟─51460ab4-4538-48d6-8093-3aeacdb99cd7
 # ╠═bbb0a790-6a81-4707-8d07-51fe9cdbb3fb
 # ╠═5eeb448f-64dc-4afa-b8bc-dd15018d61e3
-# ╠═8bd06fff-4ecf-451b-bba5-0f9c94b37869
+# ╟─8bd06fff-4ecf-451b-bba5-0f9c94b37869
+# ╟─5a4354f0-86f9-42e4-a657-809329b87608
 # ╟─30b00c83-89f2-4c4c-849a-d96bab90c488
 # ╠═f5d3b145-e85e-4f1a-9453-06d55240dd0f
 # ╠═599df2c2-50a0-4d61-8d35-0c3be46781a6
+# ╟─dd0212b9-ff19-4e33-b28f-49e55707c087
 # ╠═96c2336f-befa-44df-9535-96b5f9785a37
 # ╟─4f65f016-60a9-4770-9b4d-bd8f12fee75a
+# ╟─a2da758f-50d8-4b66-b29a-2616f1b6cdc8
 # ╟─d0a607fb-bf7f-4e5e-98b2-c967b475d3db
 # ╟─49174e6d-0dcb-4b79-b589-49de7b4b2021
-# ╠═335adb69-1436-4964-acea-0327d125d473
-# ╟─35b7a303-e78d-45c5-90de-9e92d47ce4d4
+# ╟─87ef5096-888d-4ec7-9868-011ffb16110c
+# ╟─d285bccb-9eac-4d1d-b5b6-ddd45dcad597
 # ╠═046df611-d8f8-420a-83f7-f6e41e20cd47
 # ╟─5224a688-49f6-4828-af23-11e9fa2a6881
+# ╟─2d61141d-45b0-4afb-ae90-ad5f2341d739
+# ╠═335adb69-1436-4964-acea-0327d125d473
+# ╟─35b7a303-e78d-45c5-90de-9e92d47ce4d4
+# ╟─6e77f1f8-5837-40e5-8903-7fa70944a323
 # ╟─32891d70-c0da-400e-94dd-87eee99a13b0
 # ╟─b5f425b0-a395-44fc-ab26-96983fcc33db
 # ╠═5b1ee65d-1375-497e-9510-0c6dc7d261be
@@ -1398,15 +1531,16 @@ version = "0.9.1+5"
 # ╟─11a6cb10-fe44-48e9-aa58-43ff79791a9d
 # ╠═36d6cddb-af71-48bd-a8a3-fbb5312f903f
 # ╠═6327a54c-0c11-4af5-9d71-6023fc6dab05
-# ╟─d35830f5-b68c-4ec6-9d37-cb38c446eeef
 # ╠═2437dcd8-f78b-419f-a0f1-7365fa2186b7
 # ╠═01f79750-3b10-4d55-a30b-d7534d7e13af
 # ╟─ca493590-4856-4aad-b0cf-c8ee702fe74a
+# ╟─773f3396-cd33-4e4c-8adf-7812778e31e1
 # ╠═c6add09a-f39e-44e2-97ee-05be9342214b
 # ╠═7c87ad33-e0c1-4fd4-99a5-0787fe6fedab
 # ╠═67068f89-fed7-4730-a0c8-3b98c6f5760b
 # ╟─e3ffc814-e220-49bc-bd31-5104f6114685
 # ╠═17aa79f5-cc68-43be-82c1-432ba754c440
 # ╠═521e2295-b07e-4671-b656-a8a5eaa6be51
+# ╟─f26fb00b-49f3-4495-b243-e6c2dab8954d
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
