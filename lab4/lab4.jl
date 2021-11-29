@@ -5,7 +5,10 @@ using Markdown
 using InteractiveUtils
 
 # ╔═╡ c5fc5ae8-bb04-4e6a-abd2-11111ef7e7ab
-using Distributions, StatsBase, StatsPlots, LinearAlgebra, LaTeXStrings, PlutoUI, DSP
+using Distributions, StatsBase, Plots, LinearAlgebra, LaTeXStrings, PlutoUI, DSP
+
+# ╔═╡ eefea893-c3ad-4d6c-90fe-81b115704554
+PlutoUI.TableOfContents()
 
 # ╔═╡ a464cbae-5084-11ec-1200-61caa9151191
 md"
@@ -22,7 +25,7 @@ Throughout this lab, the [Distributions.jl](https://github.com/JuliaStats/Distri
 # ╔═╡ 14f33cc4-ad48-4ca7-8472-a6b2b28cd72e
 md"
 
-## Generating Low-Pass Random Processes
+## 1. Generating Low-Pass Random Processes
 
 Given an infinite sequence of i.i.d. Gaussian random variables, $$\{X_k\}$$, we can construct a bandlimited White Gaussian Noise (WGN) process by the Shannon-Nyquist sampling theorem.
 
@@ -32,9 +35,11 @@ where $$X_k = X(kT)$$.
 
 To numerically approximate,
 
-$$X(t) \approx \displaystyle\sum_{k_t - m}^{k_t + m}X_k\text{sinc}\left(\frac{t-kT}{T}\right),$$
+$$X(t) \approx \displaystyle\sum_{k = k_t - m}^{k_t + m}X_k \text{sinc}\left(\frac{t-kT}{T}\right),$$
 
 where $$k_t = \lfloor t/T \rfloor$$. For the purpose of this lab, we choose the approximation limit $$m = 5$$ and sampling time $$T=1$$.
+
+Note that this summation matches $$\sum_k X(t)\delta(kT) \star 2B\text{sinc}(2Bt)$$ for $$T=2B=1$$, implying that $$X(t)$$ is a bandlimited (low-pass filtered) white noise signal with bandwidth $$|f| < B$$. Note that as the samples $$X_k$$ imply, we have taken $$X(t) = 0$$ for $$t<0$$.
 
 "
 
@@ -47,17 +52,20 @@ m = 5; T = 1; Δt = T/m;
 # ╔═╡ 9780daba-15fa-49f1-b715-afedd5298885
 Xₖ(n) = [Normal(μ, σ²) for k ∈ 1:n]
 
+# ╔═╡ 1dd7c43f-e6f8-4736-b193-8eeb06e36f3e
+kₜ(t) = floor(Int, t/T)
+
 # ╔═╡ 75328846-d08d-406e-9c7a-825a39a57a87
-kₜ(t, m) = max(floor(Int, t/T)+1 + m, 1)
+kₜ(t, m) = max(kₜ(t) + m, 0) # minimum clamped at 0; maximum ≥ 0
 
 # ╔═╡ 942d6539-9c24-4769-82ef-32bd89e43da6
-Xₜ(Xₖ, t, T, m) = sum([Xₖ[k]*sinc(t/T - k) for k ∈ kₜ(t, -m):kₜ(t, m)])
+Xₜ(t, Xₖ, T, m) = sum([Xₖ[k+1]*sinc(t/T - k) for k ∈ kₜ(t, -m):kₜ(t, m)])
 
 # ╔═╡ 44fe2fa1-0b27-4f5f-a136-c203a2b9ceb4
 begin
 	ts    = 0:Δt:4000T;
-	Xk    = rand.(Xₖ(4000T/Δt + m + 1));
-	Xt(t) = Xₜ(Xk, t, T, m);
+	Xk    = rand.(Xₖ(4000T/Δt + m));
+	Xt(t) = Xₜ(t, Xk, T, m);
 end
 
 # ╔═╡ 6b410b33-2d45-4f32-821b-ef15ba1b53e1
@@ -79,7 +87,116 @@ end
 # ╔═╡ f38836f0-56de-4a9d-9882-39bc3cfcadcd
 md"
 
-## LTI systems
+## 2. LTI Systems and Random Processes
+
+A Linear Time-Invariant (LTI) Have a filter now with impulse response $$h(t) = e^{-at}(u(t)-u(t-20))$$, i.e., a truncated RC low-pass filter which is cut to zero for $$t>20$$ seconds.
+
+We know, the output random process $$Y(t) = X(t) \star h(t)$$ which is the continuous-time convolution of the input random process and the impulse response. For computational purposes, we can approximate it as a Riemann integral,
+
+$$Y(t) \approx \displaystyle\sum_{k=-\infty}^{\infty}X(t-\tau)e^{-a\tau}(u(\tau)-u(\tau-20))d\tau,$$
+
+where for the purpose numerical approximation of $$X(t)$$, following section 1, we take $$\tau_t(k) = \left(t - \lfloor t/T \rfloor\right) + k\Delta t$$ for which $$d\tau_t(k) = \Delta t$$. Also note that since h(t) is truncated, the maximum range of the samples will correspond to $$20/\Delta t$$ and will only be non-zero for $$k>0$$. Thus, we get,
+
+$$Y(t) \approx \displaystyle\sum_{k=0}^{20/\Delta t}X(\lfloor t/T \rfloor - k\Delta t)e^{-a\left(\left(t - \lfloor t/T \rfloor\right) + k\Delta t\right)}\Delta t$$
+
+"
+
+# ╔═╡ 52e5db27-c47d-4f06-90d5-8e7c71a676da
+τₜ(t, k) = (t - kₜ(t)) + k*Δt
+
+# ╔═╡ 4b800460-de8a-4ca2-a772-99712febcc9a
+Y(t, Xₖ, a, T, m) = sum([Xₜ(t-τₜ(t, k), Xₖ, T, m)*exp(-a*τₜ(t, k)) for k ∈ 0:20/Δt])*Δt
+
+# ╔═╡ 00ed51bb-7b14-4bc9-9884-55922d7a0e73
+begin
+	a₁ = 0; a₂ = 0.2; # h(t) = exp(-aᵢt) for 0 < t < 20
+	Yt(t, a) = Y(t, Xk, a, T, m);
+end
+
+# ╔═╡ 6b669b5c-621c-4f7b-8708-ace0bdf69c0b
+begin
+	Yt₁(t) = Yt(t, a₁);
+	plot(ts, Yt₁.(ts); legend=false) |> as_svg
+end
+
+# ╔═╡ 6e2f23be-56f9-4392-b4e7-f09e0a014385
+begin
+	Yt₂(t) = Yt(t, a₂);
+	plot(ts, Yt₂.(ts); legend=false) |> as_svg
+end
+
+# ╔═╡ 322f42cc-69cb-4a38-8687-21d7eeaa1b22
+md"
+
+## 3. Power Spectral Density of Random Processes
+
+For LTI systems, we have the result that,
+
+$$S_Y(f) = S_X(f)|H(f)|^2$$
+
+Bunch of maths here to get H(f).
+
+We expect $$S_Y(f) = \frac{N_0}{2}|H(f)|^2 = |H(f)|^2$$, since $$N_0 = 2$$. Thus, the theoretical power spectral densities (PSDs in short) of $$Y(t)$$ for filters with different exponents are,
+
+$$S_Y(f) = 
+\begin{cases}
+, a = 0\\
+, a = 0.2
+\end{cases}$$
+
+"
+
+# ╔═╡ 806f3a8a-38b1-4384-95d0-5aeb222fa0ff
+md"
+
+## 4. PSD from Sample Functions
+
+We can estimate the above PSDs from the sample functions generated above. Take $$Y(kT)$$ and take the FFT, square abs value. We use the `periodogram` function in [DSP.jl](https://github.com/JuliaDSP/DSP.jl) package.
+
+"
+
+# ╔═╡ 6b95c142-5fda-4734-95bc-2c9272bc506b
+begin
+	Sᵧ₁ = periodogram(Yt₁.(0:1/T:4000T); fs=1/T);
+	plot(Sᵧ₁.freq, Sᵧ₁.power; label=L"a = 0") |> as_svg
+end
+
+# ╔═╡ 06f05a08-0739-45d4-b60f-7f36f299e99e
+begin
+	Sᵧ₂ = periodogram(Yt₂.(0:1/T:4000T); fs=1/T);
+	plot(Sᵧ₂.freq, Sᵧ₂.power; label=L"a = 0.2") |> as_svg
+end
+
+# ╔═╡ 8fc09b76-ccc8-4c8d-a904-97c93a41e3dd
+md"
+
+## 5. PSD Estimation over Ensembles
+
+ensemble average approach to determine the power spectral density. It is the definition of PSD. We do it $$N = 20$$ times.
+
+"
+
+# ╔═╡ aa9180dc-e39e-4ac9-a9bc-ce9fb044cc2f
+N = 20;
+
+# ╔═╡ a20cc1fd-0ba2-46de-83e0-504c496c154e
+Y(0:1/T:4000T, <Xk[i]>, <a>, T, m);
+
+# ╔═╡ 4974b7ab-28ac-4d0f-b9cb-a0bdac26238a
+md"
+
+## 6. Ergodicity, Autocorrelation, and PSD
+
+Prove $$Y(t)$$ ergodic. Wiener Khinchin Theorem
+
+"
+
+# ╔═╡ a62980d6-42c3-440c-a8fa-ffbecb35827a
+md"
+
+## 7. Code
+
+Note that this lab report can be run on the cloud and viewed as is on the github repository page [here](https://pranshumalik14.github.io/ece537-labs/lab4/lab4.jl.html). All code for the notebook can be accessed [here](https://github.com/pranshumalik14/ece537-labs).
 
 "
 
@@ -90,17 +207,17 @@ DSP = "717857b8-e6f2-59f4-9121-6e50c889abd2"
 Distributions = "31c24e10-a181-5473-b8eb-7969acd0382f"
 LaTeXStrings = "b964fa9f-0449-5b57-a5c2-d3ea65f4040f"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
+Plots = "91a5bcdd-55d7-5caf-9e0b-520d859cae80"
 PlutoUI = "7f904dfe-b85e-4ff6-b463-dae2292396a8"
 StatsBase = "2913bbd2-ae8a-5f71-8c99-4fb6c76f3a91"
-StatsPlots = "f3b207a7-027a-5e70-b257-86293d7955fd"
 
 [compat]
 DSP = "~0.7.3"
 Distributions = "~0.25.34"
 LaTeXStrings = "~1.3.0"
+Plots = "~1.24.2"
 PlutoUI = "~0.7.20"
 StatsBase = "~0.33.13"
-StatsPlots = "~0.14.29"
 """
 
 # ╔═╡ 00000000-0000-0000-0000-000000000002
@@ -128,26 +245,8 @@ version = "3.3.1"
 [[ArgTools]]
 uuid = "0dad84c5-d112-42e6-8d28-ef12dabb789f"
 
-[[Arpack]]
-deps = ["Arpack_jll", "Libdl", "LinearAlgebra"]
-git-tree-sha1 = "2ff92b71ba1747c5fdd541f8fc87736d82f40ec9"
-uuid = "7d9fca2a-8960-54d3-9f78-7d1dccf2cb97"
-version = "0.4.0"
-
-[[Arpack_jll]]
-deps = ["Libdl", "OpenBLAS_jll", "Pkg"]
-git-tree-sha1 = "e214a9b9bd1b4e1b4f15b22c0994862b66af7ff7"
-uuid = "68821587-b530-5797-8361-c406ea357684"
-version = "3.5.0+3"
-
 [[Artifacts]]
 uuid = "56f22d72-fd6d-98f1-02f0-08ddc0907c33"
-
-[[AxisAlgorithms]]
-deps = ["LinearAlgebra", "Random", "SparseArrays", "WoodburyMatrices"]
-git-tree-sha1 = "66771c8d21c8ff5e3a93379480a2307ac36863f7"
-uuid = "13072b0f-2c55-5437-9ae7-d433b7a33950"
-version = "1.0.1"
 
 [[Base64]]
 uuid = "2a0f44e3-6c83-55bd-87e4-b1978d98bd5f"
@@ -175,12 +274,6 @@ deps = ["LinearAlgebra", "Test"]
 git-tree-sha1 = "9a1d594397670492219635b35a3d830b04730d62"
 uuid = "9e997f8a-9a97-42d5-a9f1-ce6bfc15e2c0"
 version = "0.1.1"
-
-[[Clustering]]
-deps = ["Distances", "LinearAlgebra", "NearestNeighbors", "Printf", "SparseArrays", "Statistics", "StatsBase"]
-git-tree-sha1 = "75479b7df4167267d75294d14b58244695beb2ac"
-uuid = "aaaa29a8-35af-508c-8bc3-b662a17a0fe5"
-version = "0.14.2"
 
 [[ColorSchemes]]
 deps = ["ColorTypes", "Colors", "FixedPointNumbers", "Random"]
@@ -238,12 +331,6 @@ git-tree-sha1 = "bfc1187b79289637fa0ef6d4436ebdfe6905cbd6"
 uuid = "e2d170a0-9d28-54be-80f0-106bbe20a464"
 version = "1.0.0"
 
-[[DataValues]]
-deps = ["DataValueInterfaces", "Dates"]
-git-tree-sha1 = "d88a19299eba280a6d062e135a43f00323ae70bf"
-uuid = "e7dc6d0d-1eca-5fa6-8ad6-5aecde8b7ea5"
-version = "0.4.13"
-
 [[Dates]]
 deps = ["Printf"]
 uuid = "ade2ca70-3891-5945-98fb-dc099432e06a"
@@ -257,12 +344,6 @@ deps = ["InverseFunctions", "Test"]
 git-tree-sha1 = "80c3e8639e3353e5d2912fb3a1916b8455e2494b"
 uuid = "b429d917-457f-4dbc-8f4c-0cc954292b1d"
 version = "0.4.0"
-
-[[Distances]]
-deps = ["LinearAlgebra", "Statistics", "StatsAPI"]
-git-tree-sha1 = "837c83e5574582e07662bbbba733964ff7c26b9d"
-uuid = "b4f34e82-e78d-54a5-968a-f98e89d6e8f7"
-version = "0.10.6"
 
 [[Distributed]]
 deps = ["Random", "Serialization", "Sockets"]
@@ -459,12 +540,6 @@ version = "2018.0.3+2"
 deps = ["Markdown"]
 uuid = "b77e0a4c-d291-57a0-90e8-8db25a27a240"
 
-[[Interpolations]]
-deps = ["AxisAlgorithms", "ChainRulesCore", "LinearAlgebra", "OffsetArrays", "Random", "Ratios", "Requires", "SharedArrays", "SparseArrays", "StaticArrays", "WoodburyMatrices"]
-git-tree-sha1 = "61aa005707ea2cebf47c8d780da8dc9bc4e0c512"
-uuid = "a98d9a8b-a2ab-59e6-89dd-64a1c18fca59"
-version = "0.13.4"
-
 [[Intervals]]
 deps = ["Dates", "Printf", "RecipesBase", "Serialization", "TimeZones"]
 git-tree-sha1 = "323a38ed1952d30586d0fe03412cde9399d3618b"
@@ -509,12 +584,6 @@ deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
 git-tree-sha1 = "d735490ac75c5cb9f1b00d8b5509c11984dc6943"
 uuid = "aacddb02-875f-59d6-b918-886e6ef4fbf8"
 version = "2.1.0+0"
-
-[[KernelDensity]]
-deps = ["Distributions", "DocStringExtensions", "FFTW", "Interpolations", "StatsBase"]
-git-tree-sha1 = "591e8dc09ad18386189610acafb970032c519707"
-uuid = "5ab0869b-81aa-558d-bb23-cbf5423bbe9b"
-version = "0.6.3"
 
 [[LAME_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
@@ -672,12 +741,6 @@ version = "0.7.3"
 [[MozillaCACerts_jll]]
 uuid = "14a3606d-f60d-562e-9121-12d972cd8159"
 
-[[MultivariateStats]]
-deps = ["Arpack", "LinearAlgebra", "SparseArrays", "Statistics", "StatsBase"]
-git-tree-sha1 = "8d958ff1854b166003238fe191ec34b9d592860a"
-uuid = "6f286f6a-111f-5878-ab1e-185364afe411"
-version = "0.8.0"
-
 [[MutableArithmetics]]
 deps = ["LinearAlgebra", "SparseArrays", "Test"]
 git-tree-sha1 = "7bb6853d9afec54019c1397c6eb610b9b9a19525"
@@ -689,35 +752,14 @@ git-tree-sha1 = "bfe47e760d60b82b66b61d2d44128b62e3a369fb"
 uuid = "77ba4419-2d1f-58cd-9bb1-8ffee604a2e3"
 version = "0.3.5"
 
-[[NearestNeighbors]]
-deps = ["Distances", "StaticArrays"]
-git-tree-sha1 = "16baacfdc8758bc374882566c9187e785e85c2f0"
-uuid = "b8a86587-4115-5ab1-83bc-aa920d37bbce"
-version = "0.4.9"
-
 [[NetworkOptions]]
 uuid = "ca575930-c2e3-43a9-ace4-1e988b2c1908"
-
-[[Observables]]
-git-tree-sha1 = "fe29afdef3d0c4a8286128d4e45cc50621b1e43d"
-uuid = "510215fc-4207-5dde-b226-833fc4488ee2"
-version = "0.4.0"
-
-[[OffsetArrays]]
-deps = ["Adapt"]
-git-tree-sha1 = "043017e0bdeff61cfbb7afeb558ab29536bbb5ed"
-uuid = "6fe1bfb0-de20-5000-8ca7-80f57d26f881"
-version = "1.10.8"
 
 [[Ogg_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
 git-tree-sha1 = "7937eda4681660b4d6aeeecc2f7e1c81c8ee4e2f"
 uuid = "e7412a2a-1a6e-54c0-be00-318e2571c051"
 version = "1.3.5+0"
-
-[[OpenBLAS_jll]]
-deps = ["Artifacts", "CompilerSupportLibraries_jll", "Libdl"]
-uuid = "4536629a-c528-5b80-bd46-f80d51c5b363"
 
 [[OpenLibm_jll]]
 deps = ["Artifacts", "Libdl"]
@@ -834,12 +876,6 @@ uuid = "3fa0cd96-eef1-5676-8a61-b3b8758bbffb"
 deps = ["Serialization"]
 uuid = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
 
-[[Ratios]]
-deps = ["Requires"]
-git-tree-sha1 = "01d341f502250e81f6fec0afe662aa861392a3aa"
-uuid = "c84ed2f1-dad5-54f0-aa8e-dbefe2724439"
-version = "0.4.2"
-
 [[RecipesBase]]
 git-tree-sha1 = "6bf3f380ff52ce0832ddd3a2a7b9538ed1bcca7d"
 uuid = "3cdcf5f2-1ef4-517c-9805-6587b60abb01"
@@ -882,12 +918,6 @@ deps = ["Dates"]
 git-tree-sha1 = "0b4b7f1393cff97c33891da2a0bf69c6ed241fda"
 uuid = "6c6a2e73-6563-6170-7368-637461726353"
 version = "1.1.0"
-
-[[SentinelArrays]]
-deps = ["Dates", "Random"]
-git-tree-sha1 = "f45b34656397a1f6e729901dc9ef679610bd12b5"
-uuid = "91c51154-3ec4-41a3-a24f-3f23e20d615c"
-version = "1.3.8"
 
 [[Serialization]]
 uuid = "9e88b42a-f829-5b0c-bbe9-9e923198166b"
@@ -948,12 +978,6 @@ git-tree-sha1 = "bedb3e17cc1d94ce0e6e66d3afa47157978ba404"
 uuid = "4c63d2b9-4356-54db-8cca-17b64c39e42c"
 version = "0.9.14"
 
-[[StatsPlots]]
-deps = ["Clustering", "DataStructures", "DataValues", "Distributions", "Interpolations", "KernelDensity", "LinearAlgebra", "MultivariateStats", "Observables", "Plots", "RecipesBase", "RecipesPipeline", "Reexport", "StatsBase", "TableOperations", "Tables", "Widgets"]
-git-tree-sha1 = "d6956cefe3766a8eb5caae9226118bb0ac61c8ac"
-uuid = "f3b207a7-027a-5e70-b257-86293d7955fd"
-version = "0.14.29"
-
 [[StructArrays]]
 deps = ["Adapt", "DataAPI", "StaticArrays", "Tables"]
 git-tree-sha1 = "2ce41e0d042c60ecd131e9fb7154a3bfadbf50d3"
@@ -967,12 +991,6 @@ uuid = "4607b0f0-06f3-5cda-b6b1-a6196a1729e9"
 [[TOML]]
 deps = ["Dates"]
 uuid = "fa267f1f-6049-4f14-aa54-33bafae1ed76"
-
-[[TableOperations]]
-deps = ["SentinelArrays", "Tables", "Test"]
-git-tree-sha1 = "e383c87cf2a1dc41fa30c093b2a19877c83e1bc1"
-uuid = "ab02a1b2-a7df-11e8-156e-fb1833f50b87"
-version = "1.2.0"
 
 [[TableTraits]]
 deps = ["IteratorInterfaceExtensions"]
@@ -1029,18 +1047,6 @@ deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
 git-tree-sha1 = "66d72dc6fcc86352f01676e8f0f698562e60510f"
 uuid = "2381bf8a-dfd0-557d-9999-79630e7b1b91"
 version = "1.23.0+0"
-
-[[Widgets]]
-deps = ["Colors", "Dates", "Observables", "OrderedCollections"]
-git-tree-sha1 = "80661f59d28714632132c73779f8becc19a113f2"
-uuid = "cc8bc4a8-27d6-5769-a93b-9d913e69aa62"
-version = "0.6.4"
-
-[[WoodburyMatrices]]
-deps = ["LinearAlgebra", "SparseArrays"]
-git-tree-sha1 = "de67fa59e33ad156a590055375a30b23c40299d3"
-uuid = "efce3f68-66dc-5838-9240-27a6d6f5f9b6"
-version = "0.5.5"
 
 [[XML2_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Libiconv_jll", "Pkg", "Zlib_jll"]
@@ -1242,12 +1248,14 @@ version = "0.9.1+5"
 """
 
 # ╔═╡ Cell order:
+# ╟─eefea893-c3ad-4d6c-90fe-81b115704554
 # ╟─a464cbae-5084-11ec-1200-61caa9151191
 # ╠═c5fc5ae8-bb04-4e6a-abd2-11111ef7e7ab
 # ╟─14f33cc4-ad48-4ca7-8472-a6b2b28cd72e
 # ╠═b2d803e8-d32a-4a5c-be74-2ec90c93856f
 # ╠═9b06c067-34b8-4ce1-b758-eeaad0e13c27
 # ╠═9780daba-15fa-49f1-b715-afedd5298885
+# ╠═1dd7c43f-e6f8-4736-b193-8eeb06e36f3e
 # ╠═75328846-d08d-406e-9c7a-825a39a57a87
 # ╠═942d6539-9c24-4769-82ef-32bd89e43da6
 # ╠═44fe2fa1-0b27-4f5f-a136-c203a2b9ceb4
@@ -1255,5 +1263,19 @@ version = "0.9.1+5"
 # ╟─3cea316b-4f53-4416-b27f-3752feb3bef5
 # ╟─2e4863fa-1a75-4c56-ad51-0bc9efcae433
 # ╟─f38836f0-56de-4a9d-9882-39bc3cfcadcd
+# ╠═52e5db27-c47d-4f06-90d5-8e7c71a676da
+# ╠═4b800460-de8a-4ca2-a772-99712febcc9a
+# ╠═00ed51bb-7b14-4bc9-9884-55922d7a0e73
+# ╟─6b669b5c-621c-4f7b-8708-ace0bdf69c0b
+# ╟─6e2f23be-56f9-4392-b4e7-f09e0a014385
+# ╟─322f42cc-69cb-4a38-8687-21d7eeaa1b22
+# ╟─806f3a8a-38b1-4384-95d0-5aeb222fa0ff
+# ╟─6b95c142-5fda-4734-95bc-2c9272bc506b
+# ╟─06f05a08-0739-45d4-b60f-7f36f299e99e
+# ╟─8fc09b76-ccc8-4c8d-a904-97c93a41e3dd
+# ╠═aa9180dc-e39e-4ac9-a9bc-ce9fb044cc2f
+# ╠═a20cc1fd-0ba2-46de-83e0-504c496c154e
+# ╟─4974b7ab-28ac-4d0f-b9cb-a0bdac26238a
+# ╟─a62980d6-42c3-440c-a8fa-ffbecb35827a
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002

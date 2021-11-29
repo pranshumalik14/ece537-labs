@@ -1,5 +1,5 @@
 ### A Pluto.jl notebook ###
-# v0.17.1
+# v0.17.2
 
 using Markdown
 using InteractiveUtils
@@ -377,6 +377,15 @@ var(𝑁samples; corrected=false)
 md"
 
 Note that both values are close to $$\lambda t = 10$$ which verifies that the simulation is accurate.
+
+"
+
+# ╔═╡ 4861500d-3bd5-4387-a3f3-dfbc2c748ae9
+md"
+
+## 3. Code
+
+Note that this lab report can be run on the cloud and viewed as is on the github repository page [here](https://pranshumalik14.github.io/ece537-labs/lab3/lab3.jl.html). All code for the notebook can be accessed [here](https://github.com/pranshumalik14/ece537-labs).
 
 "
 
@@ -836,9 +845,9 @@ uuid = "8f399da3-3557-5675-b5ff-fb832c97cbdb"
 
 [[Libffi_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
-git-tree-sha1 = "761a393aeccd6aa92ec3515e428c26bf99575b3b"
+git-tree-sha1 = "0b4a5d71f3e5200a7dff793393e09dfc2d874290"
 uuid = "e9f186c6-92d2-5b65-8a66-fee21dc1b490"
-version = "3.2.2+0"
+version = "3.2.2+1"
 
 [[Libgcrypt_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Libgpg_error_jll", "Pkg"]
@@ -1502,7 +1511,7 @@ version = "0.9.1+5"
 # ╟─51460ab4-4538-48d6-8093-3aeacdb99cd7
 # ╠═bbb0a790-6a81-4707-8d07-51fe9cdbb3fb
 # ╠═5eeb448f-64dc-4afa-b8bc-dd15018d61e3
-# ╟─8bd06fff-4ecf-451b-bba5-0f9c94b37869
+# ╠═8bd06fff-4ecf-451b-bba5-0f9c94b37869
 # ╟─5a4354f0-86f9-42e4-a657-809329b87608
 # ╟─30b00c83-89f2-4c4c-849a-d96bab90c488
 # ╠═f5d3b145-e85e-4f1a-9453-06d55240dd0f
@@ -1542,5 +1551,6 @@ version = "0.9.1+5"
 # ╠═17aa79f5-cc68-43be-82c1-432ba754c440
 # ╠═521e2295-b07e-4671-b656-a8a5eaa6be51
 # ╟─f26fb00b-49f3-4495-b243-e6c2dab8954d
+# ╟─4861500d-3bd5-4387-a3f3-dfbc2c748ae9
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
