@@ -5,7 +5,7 @@ using Markdown
 using InteractiveUtils
 
 # ╔═╡ c5fc5ae8-bb04-4e6a-abd2-11111ef7e7ab
-using Distributions, StatsBase, Plots, LinearAlgebra, LaTeXStrings, PlutoUI, DSP
+using Distributions, StatsBase, Plots, LinearAlgebra, LaTeXStrings, PlutoUI, DSP, FFTW
 
 # ╔═╡ eefea893-c3ad-4d6c-90fe-81b115704554
 PlutoUI.TableOfContents()
@@ -29,17 +29,17 @@ md"
 
 Given an infinite sequence of i.i.d. Gaussian random variables, $$\{X_k\}$$, we can construct a bandlimited White Gaussian Noise (WGN) process by the Shannon-Nyquist sampling theorem.
 
-$$X(t) = \displaystyle\sum_{-\infty}^{\infty}X_k\text{sinc}\left(\frac{t-kT}{T}\right),$$
+$$X(t) = \displaystyle\sum_{-\infty}^{\infty}X_k\:\text{sinc}\left(\frac{t-kT}{T}\right),$$
 
 where $$X_k = X(kT)$$.
 
 To numerically approximate,
 
-$$X(t) \approx \displaystyle\sum_{k = k_t - m}^{k_t + m}X_k \text{sinc}\left(\frac{t-kT}{T}\right),$$
+$$X(t) \approx \displaystyle\sum_{k = k_t - m}^{k_t + m}X_k\: \text{sinc}\left(\frac{t-kT}{T}\right),$$
 
 where $$k_t = \lfloor t/T \rfloor$$. For the purpose of this lab, we choose the approximation limit $$m = 5$$ and sampling time $$T=1$$.
 
-Note that this summation matches $$\sum_k X(t)\delta(kT) \star 2B\text{sinc}(2Bt)$$ for $$T=2B=1$$, implying that $$X(t)$$ is a bandlimited (low-pass filtered) white noise signal with bandwidth $$|f| < B$$. Note that as the samples $$X_k$$ imply, we have taken $$X(t) = 0$$ for $$t<0$$.
+Note that this summation matches $$\sum_k X(t)\delta(kT) \star 2B\:\text{sinc}(2Bt)$$ for $$T=2B=1$$, implying that $$X(t)$$ is a bandlimited (low-pass filtered) white noise signal with bandwidth $$|f| < B$$. Note that as the samples $$X_k$$ imply, we have taken $$X(t) = 0$$ for $$t<0$$.
 
 "
 
@@ -64,9 +64,12 @@ Xₜ(t, Xₖ, T, m) = sum([Xₖ[k+1]*sinc(t/T - k) for k ∈ kₜ(t, -m):kₜ(t,
 # ╔═╡ 44fe2fa1-0b27-4f5f-a136-c203a2b9ceb4
 begin
 	ts    = 0:Δt:4000T;
-	Xk    = rand.(Xₖ(4000T/Δt + m));
+	Xk    = rand.(Xₖ(20_000)); # a large array
 	Xt(t) = Xₜ(t, Xk, T, m);
 end
+
+# ╔═╡ 8ad22be0-f97c-4c6b-ad42-efa74f3acb4b
+Xk
 
 # ╔═╡ 6b410b33-2d45-4f32-821b-ef15ba1b53e1
 begin
@@ -134,14 +137,16 @@ For LTI systems, we have the result that,
 
 $$S_Y(f) = S_X(f)|H(f)|^2$$
 
-Bunch of maths here to get H(f).
+Bunch of maths here to get H(f). Multiply with complex conj. Finally, we get,
+
+$$|H(f)|^2 = \frac{1 + e^{-20a}(e^2 - 2\cos(40\pi f))}{a^2 + 4\pi^2f^2}$$
 
 We expect $$S_Y(f) = \frac{N_0}{2}|H(f)|^2 = |H(f)|^2$$, since $$N_0 = 2$$. Thus, the theoretical power spectral densities (PSDs in short) of $$Y(t)$$ for filters with different exponents are,
 
 $$S_Y(f) = 
 \begin{cases}
-, a = 0\\
-, a = 0.2
+\frac{1 + (e^2 - 2\cos(40\pi f))}{4\pi^2f^2}, a = 0\\
+\frac{1 + e^{-4}(e^2 - 2\cos(40\pi f))}{0.04 + 4\pi^2f^2}, a = 0.2
 \end{cases}$$
 
 "
@@ -151,21 +156,21 @@ md"
 
 ## 4. PSD from Sample Functions
 
-We can estimate the above PSDs from the sample functions generated above. Take $$Y(kT)$$ and take the FFT, square abs value. We use the `periodogram` function in [DSP.jl](https://github.com/JuliaDSP/DSP.jl) package.
+For a better estimate of the signal spectrum, we make the signal length larger. Since the bandlimited is at 0.5 Hz, we can only sample every second at a minimum. For this section, we choose the Nyquist rate and sample over 0, 2^13-1 seconds (N=2^13 make power of 2 to not include any artificial distortion due to fft). We can estimate the above PSDs from the sample functions generated above. Take $$Y(kT)$$ and take the FFT, square abs value. We use the `periodogram` function in [DSP.jl](https://github.com/JuliaDSP/DSP.jl) package.
 
 "
 
+# ╔═╡ 90e6a6af-8be0-45ea-b1c7-9d4139d27977
+Sᵧ₁ = periodogram(Yt₁.(0:1/T:2^13T-T); fs=1/T)
+
 # ╔═╡ 6b95c142-5fda-4734-95bc-2c9272bc506b
-begin
-	Sᵧ₁ = periodogram(Yt₁.(0:1/T:4000T); fs=1/T);
-	plot(Sᵧ₁.freq, Sᵧ₁.power; label=L"a = 0") |> as_svg
-end
+plot(Sᵧ₁.freq, Sᵧ₁.power; label=L"a = 0") |> as_svg
+
+# ╔═╡ 95ed5cdb-333e-4f58-8947-62a1708b2dac
+Sᵧ₂ = periodogram(Yt₂.(0:1/T:2^13T-T); fs=1/T)
 
 # ╔═╡ 06f05a08-0739-45d4-b60f-7f36f299e99e
-begin
-	Sᵧ₂ = periodogram(Yt₂.(0:1/T:4000T); fs=1/T);
-	plot(Sᵧ₂.freq, Sᵧ₂.power; label=L"a = 0.2") |> as_svg
-end
+plot(Sᵧ₂.freq, Sᵧ₂.power; label=L"a = 0.2") |> as_svg
 
 # ╔═╡ 8fc09b76-ccc8-4c8d-a904-97c93a41e3dd
 md"
@@ -179,8 +184,41 @@ ensemble average approach to determine the power spectral density. It is the def
 # ╔═╡ aa9180dc-e39e-4ac9-a9bc-ce9fb044cc2f
 N = 20;
 
+# ╔═╡ 10b8e2cf-1d59-49aa-a1d3-ea806da99ab1
+Xks = [rand.(Xₖ(20_000)) for i ∈ 1:N];
+
 # ╔═╡ a20cc1fd-0ba2-46de-83e0-504c496c154e
-Y(0:1/T:4000T, <Xk[i]>, <a>, T, m);
+Yts₁ = [[Y(t, Xks[i], a₁, T, m) for t ∈ 0:1/T:2^13T-T] for i ∈ 1:N];
+
+# ╔═╡ 32f3776a-74d6-454b-b799-b849151302db
+Yts₂ = [[Y(t, Xks[i], a₂, T, m) for t ∈ 0:1/T:2^13T-T] for i ∈ 1:N];
+
+# ╔═╡ 2584eb63-dbdb-43ac-ac23-92bd19c2ff8e
+Ssᵧ₁ = [periodogram(Yts₁[i]; fs=1/T) for i ∈ 1:N];
+
+# ╔═╡ 17df7f1c-c8f7-44ab-9da7-4734f95f6ce6
+Ssᵧ₂ = [periodogram(Yts₂[i]; fs=1/T) for i ∈ 1:N];
+
+# ╔═╡ 60632582-a785-485a-a46e-60bcca5e0710
+Pavg₁ = mean(hcat((Ssᵧ₁.|> power)...); dims=2);
+
+# ╔═╡ ee86a553-fcfe-484f-a8e8-832de1832136
+Pavg₂ = mean(hcat((Ssᵧ₂.|> power)...); dims=2);
+
+# ╔═╡ 1d5af6f7-4f7b-48bc-a847-2e8cb90cc67a
+freq₁ = Ssᵧ₁[1].freq;
+
+# ╔═╡ 53e726cc-b381-4125-82e1-71ee47d2cd3f
+freq₂ = Ssᵧ₂[1].freq;
+
+# ╔═╡ c5963cce-c7f5-43e7-a843-457990ae7095
+plot(freq₁, Pavg₁; legend=false)
+
+# ╔═╡ c3e72283-8fd6-458f-ade6-dc16dc6283fa
+plot(freq₂, Pavg₂; legend=false)
+
+# ╔═╡ 0233478b-30d4-42b9-b715-31341fe52bf8
+# todo: add/overlay expected theoretical curves from previous sections
 
 # ╔═╡ 4974b7ab-28ac-4d0f-b9cb-a0bdac26238a
 md"
@@ -190,6 +228,25 @@ md"
 Prove $$Y(t)$$ ergodic. Wiener Khinchin Theorem
 
 "
+
+# ╔═╡ 32ecb867-1835-4ac7-8601-d2794e07995d
+begin
+	Xk_l      = rand.(Xₖ(101_000));
+	ts_l      = 0:1/T:100_000T;
+	Yt_l₂(t)  = Y(t, Xk_l, a₂, T, m);
+	Ysamples₂ = Yt_l₂.(ts_l);
+	acfY₂     = autocor(Ysamples₂, 1:length(Ysamples₂)-1; demean=false);
+end
+
+# ╔═╡ 8f903097-1e59-4fec-872f-ce7f66cecfcd
+Ŝᵧ₂  = fft(acfY₂) |> fftshift
+
+# ╔═╡ 959b2542-e693-4c7f-93e0-e57267e02379
+begin
+	Nsig = length(Ŝᵧ₂);
+	freq = fftfreq(Nsig, 1/T) |> fftshift
+	plot(freq[Nsig÷2:end], abs.(Ŝᵧ₂)[Nsig÷2:end]; legend=false) |> as_svg
+end
 
 # ╔═╡ a62980d6-42c3-440c-a8fa-ffbecb35827a
 md"
@@ -205,6 +262,7 @@ PLUTO_PROJECT_TOML_CONTENTS = """
 [deps]
 DSP = "717857b8-e6f2-59f4-9121-6e50c889abd2"
 Distributions = "31c24e10-a181-5473-b8eb-7969acd0382f"
+FFTW = "7a1cc6ca-52ef-59f5-83cd-3a7055c09341"
 LaTeXStrings = "b964fa9f-0449-5b57-a5c2-d3ea65f4040f"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 Plots = "91a5bcdd-55d7-5caf-9e0b-520d859cae80"
@@ -214,6 +272,7 @@ StatsBase = "2913bbd2-ae8a-5f71-8c99-4fb6c76f3a91"
 [compat]
 DSP = "~0.7.3"
 Distributions = "~0.25.34"
+FFTW = "~1.4.5"
 LaTeXStrings = "~1.3.0"
 Plots = "~1.24.2"
 PlutoUI = "~0.7.20"
@@ -1258,6 +1317,7 @@ version = "0.9.1+5"
 # ╠═1dd7c43f-e6f8-4736-b193-8eeb06e36f3e
 # ╠═75328846-d08d-406e-9c7a-825a39a57a87
 # ╠═942d6539-9c24-4769-82ef-32bd89e43da6
+# ╠═8ad22be0-f97c-4c6b-ad42-efa74f3acb4b
 # ╠═44fe2fa1-0b27-4f5f-a136-c203a2b9ceb4
 # ╟─6b410b33-2d45-4f32-821b-ef15ba1b53e1
 # ╟─3cea316b-4f53-4416-b27f-3752feb3bef5
@@ -1270,12 +1330,28 @@ version = "0.9.1+5"
 # ╟─6e2f23be-56f9-4392-b4e7-f09e0a014385
 # ╟─322f42cc-69cb-4a38-8687-21d7eeaa1b22
 # ╟─806f3a8a-38b1-4384-95d0-5aeb222fa0ff
+# ╠═90e6a6af-8be0-45ea-b1c7-9d4139d27977
 # ╟─6b95c142-5fda-4734-95bc-2c9272bc506b
+# ╠═95ed5cdb-333e-4f58-8947-62a1708b2dac
 # ╟─06f05a08-0739-45d4-b60f-7f36f299e99e
 # ╟─8fc09b76-ccc8-4c8d-a904-97c93a41e3dd
 # ╠═aa9180dc-e39e-4ac9-a9bc-ce9fb044cc2f
+# ╠═10b8e2cf-1d59-49aa-a1d3-ea806da99ab1
 # ╠═a20cc1fd-0ba2-46de-83e0-504c496c154e
+# ╠═32f3776a-74d6-454b-b799-b849151302db
+# ╠═2584eb63-dbdb-43ac-ac23-92bd19c2ff8e
+# ╠═17df7f1c-c8f7-44ab-9da7-4734f95f6ce6
+# ╠═60632582-a785-485a-a46e-60bcca5e0710
+# ╠═ee86a553-fcfe-484f-a8e8-832de1832136
+# ╠═1d5af6f7-4f7b-48bc-a847-2e8cb90cc67a
+# ╠═53e726cc-b381-4125-82e1-71ee47d2cd3f
+# ╠═c5963cce-c7f5-43e7-a843-457990ae7095
+# ╠═c3e72283-8fd6-458f-ade6-dc16dc6283fa
+# ╠═0233478b-30d4-42b9-b715-31341fe52bf8
 # ╟─4974b7ab-28ac-4d0f-b9cb-a0bdac26238a
+# ╠═32ecb867-1835-4ac7-8601-d2794e07995d
+# ╠═8f903097-1e59-4fec-872f-ce7f66cecfcd
+# ╟─959b2542-e693-4c7f-93e0-e57267e02379
 # ╟─a62980d6-42c3-440c-a8fa-ffbecb35827a
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
