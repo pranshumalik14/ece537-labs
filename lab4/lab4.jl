@@ -16,7 +16,7 @@ md"
 # ECE537: Lab 4 Report
 > _It is recommended to access this report by opening the `html` file on the browser or by clicking [here](https://pranshumalik14.github.io/ece537-labs/lab4/lab4.jl.html)_.
 
-In the first part of the lab, we will be simulating low pass Guassian 
+In the first part of the lab, we will be simulating a bandlimited white Gaussian noise process, which will then be processed through an LTI (low-pass) filter, the output of which will also be a Gaussian process. We then derive the theoretical power spectral density of the output and compare it with the computational estimates. The comparison is in two parts, where we first average multiple sample spectral densities and then separately use the ergodicity and stationarity properties of the output random process to arrive at the same result.
 
 Throughout this lab, the [Distributions.jl](https://github.com/JuliaStats/Distributions.jl) package in Julia has been utilized to be able to use the probability constructs in code.
 
@@ -27,19 +27,15 @@ md"
 
 ## 1. Generating Low-Pass Random Processes
 
-Given an infinite sequence of i.i.d. Gaussian random variables, $$\{X_k\}$$, we can construct a bandlimited White Gaussian Noise (WGN) process by the Shannon-Nyquist sampling theorem.
+Given an infinite sequence of i.i.d. Gaussian random variables, $$\{X_k\}$$, we can construct a bandlimited white Gaussian noise (WGN) process by the Shannon-Nyquist reconstruction theorem by treating the sequence as samples of the random process every $$T$$ seconds, i.e.,
 
 $$X(t) = \displaystyle\sum_{-\infty}^{\infty}X_k\:\text{sinc}\left(\frac{t-kT}{T}\right),$$
 
-where $$X_k = X(kT)$$.
-
-To numerically approximate,
+where $$X_k := X(kT)$$ and for this lab we chose $$X_k \sim \mathcal{N}(0,1)$$. Note that the summation above matches the convolution $$\sum_k X(kT)\delta(t - kT) \ast 2B\:\text{sinc}(2Bt)$$ for $$B=1/(2T)$$, implying that $$X(t)$$ is a bandlimited (low-pass filtered) white noise signal with bandwidth $$|f| < B$$. To numerically approximate this continuous-time process, we can do the following,
 
 $$X(t) \approx \displaystyle\sum_{k = k_t - m}^{k_t + m}X_k\: \text{sinc}\left(\frac{t-kT}{T}\right),$$
 
-where $$k_t = \lfloor t/T \rfloor$$. For the purpose of this lab, we choose the approximation limit $$m = 5$$ and sampling time $$T=1$$.
-
-Note that this summation matches $$\sum_k X(t)\delta(kT) \star 2B\:\text{sinc}(2Bt)$$ for $$T=2B=1$$, implying that $$X(t)$$ is a bandlimited (low-pass filtered) white noise signal with bandwidth $$|f| < B$$. Note that as the samples $$X_k$$ imply, we have taken $$X(t) = 0$$ for $$t<0$$.
+where $$k_t := \lfloor t/T \rfloor$$. For the purpose of this lab, we chose the approximation limit $$m = 5$$ and sampling time $$T=1$$. Also note that we have assumed $$X(t) = 0$$ for $$t<0$$, as the samples $$X_k$$ imply. Thus, as developed above, we can see from the frequency domain correspondence that bandlimited WGN is simply the response of an ideal lowpass filter that is excited by WGN. We implement the process $$X(t)$$ in the code below and plot it over different timescales.
 
 "
 
@@ -74,17 +70,29 @@ Xk
 # ╔═╡ 6b410b33-2d45-4f32-821b-ef15ba1b53e1
 begin
 	as_svg(x) = PlutoUI.Show(MIME"image/svg+xml"(), repr(MIME"image/svg+xml"(), x));
-	plot(ts, Xt.(ts); legend=false) |> as_svg
+	plot(ts, Xt.(ts); legend=false)
+	xlabel!("Time [s]");
+	ylabel!("Amplitude");
+	title!(L"X(t)");
+	plot!(; xlims=(ts[1],ts[end])) |> as_svg
 end
 
 # ╔═╡ 3cea316b-4f53-4416-b27f-3752feb3bef5
 begin
 	plot(ts[1:5000], Xt.(ts[1:5000]); legend=false)
+	xlabel!("Time [s]");
+	ylabel!("Amplitude");
+	title!(L"X(t)");
+	plot!(; xlims=(ts[1:5000][1],ts[1:5000][end])) |> as_svg
 end
 
 # ╔═╡ 2e4863fa-1a75-4c56-ad51-0bc9efcae433
 begin
 	plot(ts[1:1000], Xt.(ts[1:1000]); legend=false)
+	xlabel!("Time [s]");
+	ylabel!("Amplitude");
+	title!(L"X(t)");
+	plot!(; xlims=(ts[1:1000][1],ts[1:1000][end])) |> as_svg
 end
 
 # ╔═╡ f38836f0-56de-4a9d-9882-39bc3cfcadcd
@@ -92,15 +100,17 @@ md"
 
 ## 2. LTI Systems and Random Processes
 
-A Linear Time-Invariant (LTI) Have a filter now with impulse response $$h(t) = e^{-at}(u(t)-u(t-20))$$, i.e., a truncated RC low-pass filter which is cut to zero for $$t>20$$ seconds.
+Now, we consider a a linear time-invariant (LTI) filter with impulse response $$h(t) = e^{-at}(u(t)-u(t-20))$$, i.e., a truncated RC low-pass filter with parameter $$a$$ that is cut to zero for $$t>20$$ seconds. The input to the system will be the bandlimited WGN process, $$X(t)$$, produced above and the output random process, $$Y(t)$$, is a modified or an approximate Ornstein-Uhlenbeck process due to the time-windowed $$h(t)$$.
 
-We know, the output random process $$Y(t) = X(t) \star h(t)$$ which is the continuous-time convolution of the input random process and the impulse response. For computational purposes, we can approximate it as a Riemann integral,
+From analysis of deterministic signals and systems, we know that the output random process $$Y(t) = X(t) \ast h(t)$$ which is the continuous-time convolution of the input random process and the impulse response. For computational purposes, we can approximate it as a Riemann integral,
 
 $$Y(t) \approx \displaystyle\sum_{k=-\infty}^{\infty}X(t-\tau)e^{-a\tau}(u(\tau)-u(\tau-20))d\tau,$$
 
 where for the purpose numerical approximation of $$X(t)$$, following section 1, we take $$\tau_t(k) = \left(t - \lfloor t/T \rfloor\right) + k\Delta t$$ for which $$d\tau_t(k) = \Delta t$$. Also note that since h(t) is truncated, the maximum range of the samples will correspond to $$20/\Delta t$$ and will only be non-zero for $$k>0$$. Thus, we get,
 
-$$Y(t) \approx \displaystyle\sum_{k=0}^{20/\Delta t}X(\lfloor t/T \rfloor - k\Delta t)e^{-a\left(\left(t - \lfloor t/T \rfloor\right) + k\Delta t\right)}\Delta t$$
+$$Y(t) \approx \displaystyle\sum_{k=0}^{20/\Delta t}X(\lfloor t/T \rfloor - k\Delta t)e^{-a\left(\left(t - \lfloor t/T \rfloor\right) + k\Delta t\right)}\Delta t.$$
+
+We implement the process $$Y(t)$$ in the code below and plot it for different values of the parameter $$a$$.
 
 "
 
@@ -119,13 +129,21 @@ end
 # ╔═╡ 6b669b5c-621c-4f7b-8708-ace0bdf69c0b
 begin
 	Yt₁(t) = Yt(t, a₁);
-	plot(ts, Yt₁.(ts); legend=false) |> as_svg
+	plot(ts, Yt₁.(ts); legend=false) 
+	xlabel!("Time [s]");
+	ylabel!("Amplitude");
+	title!(L"Y(t; a=0)");
+	plot!(; xlims=(ts[1],ts[end])) |> as_svg
 end
 
 # ╔═╡ 6e2f23be-56f9-4392-b4e7-f09e0a014385
 begin
 	Yt₂(t) = Yt(t, a₂);
-	plot(ts, Yt₂.(ts); legend=false) |> as_svg
+	plot(ts, Yt₂.(ts); legend=false)
+	xlabel!("Time [s]");
+	ylabel!("Amplitude");
+	title!(L"Y(t; a=0.2)");
+	plot!(; xlims=(ts[1],ts[end])) |> as_svg
 end
 
 # ╔═╡ 322f42cc-69cb-4a38-8687-21d7eeaa1b22
@@ -133,30 +151,37 @@ md"
 
 ## 3. Power Spectral Density of Random Processes
 
-For LTI systems, we have the result that,
+For LTI systems, we have the following statistical result,
 
-$$S_Y(f) = S_X(f)|H(f)|^2$$
+$$S_Y(f) = S_X(f)|H(f)|^2,$$
 
-Bunch of maths here to get H(f). Multiply with complex conj. Finally, we get,
+where $$S(f)$$ is the power spectral density (PSD) of the respective signals and $$H(f)$$ is the Fourier transform of the impulse response. Recall that, in section 1, we have treated $$X_k$$ as samples of $$X(t)$$ every $$T$$ second intervals. For a bandlimited WGN process we have the result that the samples $$X_k \sim \mathcal{N}(0, N_0B)$$ where $$N_0=2$$ is the net power of the signal $$X(t)$$ and $$B=\frac{1}{2}$$ is its bandwidth. Therefore, we have $$S_X(f) = 1 = \frac{N_0}{2}$$ for $$|f| < \frac{1}{2}$$. Furthermore, we have $$H(f) = \frac{1-e^{-20(a + j2\pi f)}}{a + j2\pi f}$$, and to get the squared magnitude of $$H$$, we multiply it with its conjugate $$H^*$$. Finally, we have,
 
 $$|H(f)|^2 = \frac{1 + e^{-20a}(e^2 - 2\cos(40\pi f))}{a^2 + 4\pi^2f^2}$$
 
-We expect $$S_Y(f) = \frac{N_0}{2}|H(f)|^2 = |H(f)|^2$$, since $$N_0 = 2$$. Thus, the theoretical power spectral densities (PSDs in short) of $$Y(t)$$ for filters with different exponents are,
+We expect $$S_Y(f) = \frac{N_0}{2}|H(f)|^2 = |H(f)|^2$$, for $$|f| < \frac{1}{2}$$ and zero elsewhere. Thus, the theoretical PSDs of $$Y(t)$$ for filters with different values of parameter $$a$$ are,
 
 $$S_Y(f) = 
 \begin{cases}
-\frac{1 + (e^2 - 2\cos(40\pi f))}{4\pi^2f^2}, a = 0\\
-\frac{1 + e^{-4}(e^2 - 2\cos(40\pi f))}{0.04 + 4\pi^2f^2}, a = 0.2
+\begin{align}
+	\frac{1 + (e^2 - 2\cos(40\pi f))}{4\pi^2f^2}, & \quad a = 0\\
+	\frac{1 + e^{-4}(e^2 - 2\cos(40\pi f))}{0.04 + 4\pi^2f^2}, & \quad a = 0.2
+\end{align}
 \end{cases}$$
 
+Note that for for $$a=0$$, $$S_Y$$ is unbounded near $$f=0$$, whereas for $$a=0.2$$ it only reaches a maximum of $$\approx 27.46$$ at $$0$$ Hz. We have created a function to get the theoretical PSD for $$Y(t)$$ below.
+
 "
+
+# ╔═╡ cbd16f03-de57-431f-9d3b-ae003200b996
+Sthᵧ(f, a) = (1 + exp(-20a)*(exp(2) - 2*cos(40π*f)))/(a^2 + 4π^2*f^2) * (f < 1/2)
 
 # ╔═╡ 806f3a8a-38b1-4384-95d0-5aeb222fa0ff
 md"
 
 ## 4. PSD from Sample Functions
 
-For a better estimate of the signal spectrum, we make the signal length larger. Since the bandlimited is at 0.5 Hz, we can only sample every second at a minimum. For this section, we choose the Nyquist rate and sample over 0, 2^13-1 seconds (N=2^13 make power of 2 to not include any artificial distortion due to fft). We can estimate the above PSDs from the sample functions generated above. Take $$Y(kT)$$ and take the FFT, square abs value. We use the `periodogram` function in [DSP.jl](https://github.com/JuliaDSP/DSP.jl) package.
+We can get an estimate of the PSD of a process from its sample functions. For a good estimate of the signal spectrum, we make the signal length larger (or have more samples). Since $$Y(t)$$ is bandlimited at $$0.5$$ Hz, we can only the signal sample every second at a minimum. For this section, we chose to sample at the Nyquist rate of $$1$$ Hz and sample over $$t \in [0, 2^{13}-1]$$ seconds, yielding $$N=2^{13}$$ samples, which is a power of $$2$$, to not include any artificial distortion due to FFT. We use the `periodogram` function in [DSP.jl](https://github.com/JuliaDSP/DSP.jl) package to get the PSD estimates $$\hat{S}_Y(f)$$ from the time-domain samples of the signal, and have plotted the results below.
 
 "
 
@@ -164,20 +189,32 @@ For a better estimate of the signal spectrum, we make the signal length larger. 
 Sᵧ₁ = periodogram(Yt₁.(0:1/T:2^13T-T); fs=1/T)
 
 # ╔═╡ 6b95c142-5fda-4734-95bc-2c9272bc506b
-plot(Sᵧ₁.freq, Sᵧ₁.power; label=L"a = 0") |> as_svg
+begin
+	plot(Sᵧ₁.freq, Sᵧ₁.power; legend=false)
+	xlabel!("Frequency [Hz]");
+	ylabel!("Power");
+	title!(L"\hat{S}_Y(f; a = 0)");
+	plot!(; xlims=(Sᵧ₁.freq[1],Sᵧ₁.freq[end]), ylims=(0, maximum(Sᵧ₁.power))) |> as_svg
+end
 
 # ╔═╡ 95ed5cdb-333e-4f58-8947-62a1708b2dac
 Sᵧ₂ = periodogram(Yt₂.(0:1/T:2^13T-T); fs=1/T)
 
 # ╔═╡ 06f05a08-0739-45d4-b60f-7f36f299e99e
-plot(Sᵧ₂.freq, Sᵧ₂.power; label=L"a = 0.2") |> as_svg
+begin
+	plot(Sᵧ₂.freq, Sᵧ₂.power; legend=false)
+	xlabel!("Frequency [Hz]");
+	ylabel!("Power");
+	title!(L"\hat{S}_Y(f; a = 0.2)");
+	plot!(; xlims=(Sᵧ₂.freq[1],Sᵧ₂.freq[end]), ylims=(0, maximum(Sᵧ₂.power))) |> as_svg
+end
 
 # ╔═╡ 8fc09b76-ccc8-4c8d-a904-97c93a41e3dd
 md"
 
 ## 5. PSD Estimation over Ensembles
 
-ensemble average approach to determine the power spectral density. It is the definition of PSD. We do it $$N = 20$$ times.
+We can get closer estimates of the true PSD, $$S_Y(f)$$ by taking the ensemble average of (the random process) $$\hat{S}_Y(f)$$. This is also the statistical definition of PSD. Here, we consider an ensemble of $$N = 20$$ i.i.d. signals $$Y(t)$$ and plot the estimated and true PSDs below.
 
 "
 
@@ -188,22 +225,18 @@ N = 20;
 Xks = [rand.(Xₖ(20_000)) for i ∈ 1:N];
 
 # ╔═╡ a20cc1fd-0ba2-46de-83e0-504c496c154e
-Yts₁ = [[Y(t, Xks[i], a₁, T, m) for t ∈ 0:1/T:2^13T-T] for i ∈ 1:N];
+begin
+	Yts₁ = [[Y(t, Xks[i], a₁, T, m) for t ∈ 0:1/T:2^13T-T] for i ∈ 1:N];
+	Ssᵧ₁ = [periodogram(Yts₁[i]; fs=1/T) for i ∈ 1:N];
+	Pavg₁ = mean(hcat((Ssᵧ₁.|> power)...); dims=2);
+end
 
 # ╔═╡ 32f3776a-74d6-454b-b799-b849151302db
-Yts₂ = [[Y(t, Xks[i], a₂, T, m) for t ∈ 0:1/T:2^13T-T] for i ∈ 1:N];
-
-# ╔═╡ 2584eb63-dbdb-43ac-ac23-92bd19c2ff8e
-Ssᵧ₁ = [periodogram(Yts₁[i]; fs=1/T) for i ∈ 1:N];
-
-# ╔═╡ 17df7f1c-c8f7-44ab-9da7-4734f95f6ce6
-Ssᵧ₂ = [periodogram(Yts₂[i]; fs=1/T) for i ∈ 1:N];
-
-# ╔═╡ 60632582-a785-485a-a46e-60bcca5e0710
-Pavg₁ = mean(hcat((Ssᵧ₁.|> power)...); dims=2);
-
-# ╔═╡ ee86a553-fcfe-484f-a8e8-832de1832136
-Pavg₂ = mean(hcat((Ssᵧ₂.|> power)...); dims=2);
+begin
+	Yts₂ = [[Y(t, Xks[i], a₂, T, m) for t ∈ 0:1/T:2^13T-T] for i ∈ 1:N];
+	Ssᵧ₂ = [periodogram(Yts₂[i]; fs=1/T) for i ∈ 1:N];
+	Pavg₂ = mean(hcat((Ssᵧ₂.|> power)...); dims=2);
+end
 
 # ╔═╡ 1d5af6f7-4f7b-48bc-a847-2e8cb90cc67a
 freq₁ = Ssᵧ₁[1].freq;
@@ -212,20 +245,35 @@ freq₁ = Ssᵧ₁[1].freq;
 freq₂ = Ssᵧ₂[1].freq;
 
 # ╔═╡ c5963cce-c7f5-43e7-a843-457990ae7095
-plot(freq₁, Pavg₁; legend=false)
+begin
+	Sthᵧ₁(f) = Sthᵧ(f, 0);
+	freq_idx₁= findfirst(x -> (x > 0.013), freq₁);
+	plot(freq₁, Pavg₁; label=L"\hat{S}_Y(f\:; a=0)")
+	plot!(freq₁[freq_idx₁:end], Sthᵧ₁.(freq₁[freq_idx₁:end]); label=L"S_Y(f\:; a=0)") 
+	xlabel!("Frequency [Hz]");
+	ylabel!("Power");
+	title!("Theoretical and Estimated PSDs for Y(t; a=0)");
+	plot!(; xlims=(freq₁[1],freq₁[end]), ylims=(0, maximum(Pavg₁))) |> as_svg
+end
 
 # ╔═╡ c3e72283-8fd6-458f-ade6-dc16dc6283fa
-plot(freq₂, Pavg₂; legend=false)
-
-# ╔═╡ 0233478b-30d4-42b9-b715-31341fe52bf8
-# todo: add/overlay expected theoretical curves from previous sections
+begin
+	Sthᵧ₂(f) = Sthᵧ(f, 0.2);
+	freq_idx₂= 1;
+	plot(freq₂, Pavg₂; label=L"\hat{S}_Y(f\:; a=0.2)")
+	plot!(freq₂[freq_idx₂:end], Sthᵧ₂.(freq₂[freq_idx₂:end]); label=L"S_Y(f\:; a=0.2)")
+	xlabel!("Frequency [Hz]");
+	ylabel!("Power");
+	title!("Theoretical and Estimated PSDs for Y(t; a=0.2)");
+	plot!(; xlims=(freq₂[1],freq₂[end]), ylims=(0, maximum(Pavg₂))) |> as_svg
+end
 
 # ╔═╡ 4974b7ab-28ac-4d0f-b9cb-a0bdac26238a
 md"
 
-## 6. Ergodicity, Autocorrelation, and PSD
+## 6. Ergodicity, Autocorrelation, and PSDs
 
-Prove $$Y(t)$$ ergodic. Wiener Khinchin Theorem
+Since $$Y(t)$$ is a Guassian process arising from bandlimited WGN, it is wide-sense stationary (WSS) and ergodic (at least in the mean-square sense). We can see this as its autocorrelation goes to zero quickly and it has an almost-constant mean (not tested here), but can be shown. We first apply the ergodic property of the $$Y(t)$$ to estimate the autocorrelation of the process in general, i.e., we use a single realization of the process to determine its mean, variance and autocorrelation. Then, by the Wiener Khinchin Theorem, we get the PSD of the WSS random process, $$Y(t)$$ from the Fourier transform of its autocorrelation function. We do this over a large time-series with $$t\in [0, 10^5]$$ seconds (for more accuracy) and plot the results below.
 
 "
 
@@ -235,8 +283,11 @@ begin
 	ts_l      = 0:1/T:100_000T;
 	Yt_l₂(t)  = Y(t, Xk_l, a₂, T, m);
 	Ysamples₂ = Yt_l₂.(ts_l);
-	acfY₂     = autocor(Ysamples₂, 1:length(Ysamples₂)-1; demean=false);
+	acfY₂     = autocor(Ysamples₂, 0:length(Ysamples₂)-1);
 end
+
+# ╔═╡ 645b9166-d2fa-4a9a-8117-553719834a4f
+plot(ts_l, acfY₂; legend=false, ylabel="Normalized Values", xlabel="Lag [s]", title=L"\hat{R}_{YY}(\tau)") |> as_svg
 
 # ╔═╡ 8f903097-1e59-4fec-872f-ce7f66cecfcd
 Ŝᵧ₂  = fft(acfY₂) |> fftshift
@@ -245,7 +296,13 @@ Ŝᵧ₂  = fft(acfY₂) |> fftshift
 begin
 	Nsig = length(Ŝᵧ₂);
 	freq = fftfreq(Nsig, 1/T) |> fftshift
-	plot(freq[Nsig÷2:end], abs.(Ŝᵧ₂)[Nsig÷2:end]; legend=false) |> as_svg
+	plot(freq[Nsig÷2:end],abs.(Ŝᵧ₂)[Nsig÷2:end]; label=L"\hat{S}_Y(f\:; a=0.2)") 
+	plot!(freq[Nsig÷2:end], Sthᵧ₂.(freq[Nsig÷2:end]); label=L"S_Y(f\:; a=0.2)")
+	xlabel!("Frequency [Hz]");
+	ylabel!("Power");
+	title!("Theoretical and Estimated PSDs for Y(t; a=0.2)");
+	plot!(; xlims=(freq[Nsig÷2:end][1],freq[Nsig÷2:end][end]), 
+		ylims=(0, maximum(abs.(Ŝᵧ₂)))) |> as_svg
 end
 
 # ╔═╡ a62980d6-42c3-440c-a8fa-ffbecb35827a
@@ -1329,6 +1386,7 @@ version = "0.9.1+5"
 # ╟─6b669b5c-621c-4f7b-8708-ace0bdf69c0b
 # ╟─6e2f23be-56f9-4392-b4e7-f09e0a014385
 # ╟─322f42cc-69cb-4a38-8687-21d7eeaa1b22
+# ╠═cbd16f03-de57-431f-9d3b-ae003200b996
 # ╟─806f3a8a-38b1-4384-95d0-5aeb222fa0ff
 # ╠═90e6a6af-8be0-45ea-b1c7-9d4139d27977
 # ╟─6b95c142-5fda-4734-95bc-2c9272bc506b
@@ -1339,17 +1397,13 @@ version = "0.9.1+5"
 # ╠═10b8e2cf-1d59-49aa-a1d3-ea806da99ab1
 # ╠═a20cc1fd-0ba2-46de-83e0-504c496c154e
 # ╠═32f3776a-74d6-454b-b799-b849151302db
-# ╠═2584eb63-dbdb-43ac-ac23-92bd19c2ff8e
-# ╠═17df7f1c-c8f7-44ab-9da7-4734f95f6ce6
-# ╠═60632582-a785-485a-a46e-60bcca5e0710
-# ╠═ee86a553-fcfe-484f-a8e8-832de1832136
 # ╠═1d5af6f7-4f7b-48bc-a847-2e8cb90cc67a
 # ╠═53e726cc-b381-4125-82e1-71ee47d2cd3f
-# ╠═c5963cce-c7f5-43e7-a843-457990ae7095
-# ╠═c3e72283-8fd6-458f-ade6-dc16dc6283fa
-# ╠═0233478b-30d4-42b9-b715-31341fe52bf8
+# ╟─c5963cce-c7f5-43e7-a843-457990ae7095
+# ╟─c3e72283-8fd6-458f-ade6-dc16dc6283fa
 # ╟─4974b7ab-28ac-4d0f-b9cb-a0bdac26238a
 # ╠═32ecb867-1835-4ac7-8601-d2794e07995d
+# ╟─645b9166-d2fa-4a9a-8117-553719834a4f
 # ╠═8f903097-1e59-4fec-872f-ce7f66cecfcd
 # ╟─959b2542-e693-4c7f-93e0-e57267e02379
 # ╟─a62980d6-42c3-440c-a8fa-ffbecb35827a
