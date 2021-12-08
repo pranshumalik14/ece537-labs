@@ -4,312 +4,59 @@
 using Markdown
 using InteractiveUtils
 
-# ╔═╡ c5fc5ae8-bb04-4e6a-abd2-11111ef7e7ab
+# ╔═╡ 94386ab7-391b-45e0-8e57-123a2b3ff913
 using Distributions, StatsBase, Plots, LinearAlgebra, LaTeXStrings, PlutoUI, DSP, FFTW
 
-# ╔═╡ eefea893-c3ad-4d6c-90fe-81b115704554
+# ╔═╡ a69e382a-b1ee-4a83-a15d-e83a9632a8c2
 PlutoUI.TableOfContents()
 
-# ╔═╡ a464cbae-5084-11ec-1200-61caa9151191
+# ╔═╡ 6848b622-5812-11ec-3f59-0349783c79cf
 md"
 
-# ECE537: Lab 4 Report
-> _It is recommended to access this report by opening the `html` file on the browser or by clicking [here](https://pranshumalik14.github.io/ece537-labs/lab4/lab4.jl.html)_.
+# ECE537: Lab 5 Report
+> _It is recommended to access this report by opening the `html` file on the browser or by clicking [here](https://pranshumalik14.github.io/ece537-labs/lab5/lab5.jl.html)_.
 
-In the first part of the lab, we will be simulating a bandlimited white Gaussian noise process, which will then be processed through an LTI (low-pass) filter, the output of which will also be a Gaussian process. We then derive the theoretical power spectral density of the output and compare it with the computational estimates. The comparison is in two parts, where we first average multiple sample spectral densities and then separately use the ergodicity and stationarity properties of the output random process to arrive at the same result.
+In the first part of the lab, we will be <>.
 
 Throughout this lab, the [Distributions.jl](https://github.com/JuliaStats/Distributions.jl) package in Julia has been utilized to be able to use the probability constructs in code.
 
 "
 
-# ╔═╡ 14f33cc4-ad48-4ca7-8472-a6b2b28cd72e
+# ╔═╡ 03871828-cfeb-41fa-b6ee-7e74ad056d6e
 md"
 
-## 1. Generating Low-Pass Random Processes
+## 1. Autoregressive Filters
 
-Given an infinite sequence of i.i.d. Gaussian random variables, $$\{X_k\}$$, we can construct a bandlimited white Gaussian noise (WGN) process by the Shannon-Nyquist reconstruction theorem by treating the sequence as samples of the random process every $$T$$ seconds, i.e.,
+Here we consider a system excited by white noise (input) and produces a random sequence $$X_n$$ as output by the following relation,
 
-$$X(t) = \displaystyle\sum_{-\infty}^{\infty}X_k\:\text{sinc}\left(\frac{t-kT}{T}\right),$$
-
-where $$X_k := X(kT)$$ and for this lab we chose $$X_k \sim \mathcal{N}(0,1)$$. Note that the summation above matches the convolution $$\sum_k X(kT)\delta(t - kT) \ast 2B\:\text{sinc}(2Bt)$$ for $$B=1/(2T)$$, implying that $$X(t)$$ is a bandlimited (low-pass filtered) white noise signal with bandwidth $$|f| < B$$. To numerically approximate this continuous-time process, we can do the following,
-
-$$X(t) \approx \displaystyle\sum_{k = k_t - m}^{k_t + m}X_k\: \text{sinc}\left(\frac{t-kT}{T}\right),$$
-
-where $$k_t := \lfloor t/T \rfloor$$. For the purpose of this lab, we chose the approximation limit $$m = 5$$ and sampling time $$T=1$$. Also note that we have assumed $$X(t) = 0$$ for $$t<0$$, as the samples $$X_k$$ imply. Thus, as developed above, we can see from the frequency domain correspondence that bandlimited WGN is simply the response of an ideal lowpass filter that is excited by WGN. We implement the process $$X(t)$$ in the code below and plot it over different timescales.
+$$X_n = 1.5X_{n-1} - 0.8X_{n-2} + N_n.$$
 
 "
 
-# ╔═╡ b2d803e8-d32a-4a5c-be74-2ec90c93856f
-μ = 0; σ² = 1;
+# ╔═╡ bcb9b4fa-2087-4ec8-affe-ad736f4296ca
+Nₙ(n) = [Normal(0,1) for k ∈ 1:n]
 
-# ╔═╡ 9b06c067-34b8-4ce1-b758-eeaad0e13c27
-m = 5; T = 1; Δt = T/m;
+# ╔═╡ 7d6a5b3a-5b43-4d45-bc7a-443d209a006c
+function Xₙ(Nn)
+	n = length(Nn); Xn = zeros(n);
+	Xn[1] = Nn[1]; Xn[2] = 1.5Nn[1]+Nn[2];
+	
+	for k ∈ 3:n  Xn[k] = 1.5Xn[k-1] - 0.8Xn[k-2] + Nn[k]  end
 
-# ╔═╡ 9780daba-15fa-49f1-b715-afedd5298885
-Xₖ(n) = [Normal(μ, σ²) for k ∈ 1:n]
-
-# ╔═╡ 1dd7c43f-e6f8-4736-b193-8eeb06e36f3e
-kₜ(t) = floor(Int, t/T)
-
-# ╔═╡ 75328846-d08d-406e-9c7a-825a39a57a87
-kₜ(t, m) = max(kₜ(t) + m, 0) # minimum clamped at 0; maximum ≥ 0
-
-# ╔═╡ 942d6539-9c24-4769-82ef-32bd89e43da6
-Xₜ(t, Xₖ, T, m) = sum([Xₖ[k+1]*sinc(t/T - k) for k ∈ kₜ(t, -m):kₜ(t, m)])
-
-# ╔═╡ 44fe2fa1-0b27-4f5f-a136-c203a2b9ceb4
-begin
-	ts    = 0:Δt:4000T;
-	Xk    = rand.(Xₖ(20_000)); # a large array
-	Xt(t) = Xₜ(t, Xk, T, m);
+	return Xn
 end
 
-# ╔═╡ 6b410b33-2d45-4f32-821b-ef15ba1b53e1
-begin
-	as_svg(x) = PlutoUI.Show(MIME"image/svg+xml"(), repr(MIME"image/svg+xml"(), x));
-	plot(ts, Xt.(ts); legend=false)
-	xlabel!("Time [s]");
-	ylabel!("Amplitude");
-	title!(L"X(t)");
-	plot!(; xlims=(ts[1],ts[end])) |> as_svg
-end
+# ╔═╡ fdea5673-5d95-41fe-90e8-dd0bed409d49
+Nn = rand.(Nₙ(600));
 
-# ╔═╡ 3cea316b-4f53-4416-b27f-3752feb3bef5
-begin
-	plot(ts[1:5000], Xt.(ts[1:5000]); legend=false)
-	xlabel!("Time [s]");
-	ylabel!("Amplitude");
-	title!(L"X(t)");
-	plot!(; xlims=(ts[1:5000][1],ts[1:5000][end])) |> as_svg
-end
+# ╔═╡ d980f36c-7de2-4cb2-8b04-48c5406cc55e
+Xn = Xₙ(Nn);
 
-# ╔═╡ 2e4863fa-1a75-4c56-ad51-0bc9efcae433
-begin
-	plot(ts[1:1000], Xt.(ts[1:1000]); legend=false)
-	xlabel!("Time [s]");
-	ylabel!("Amplitude");
-	title!(L"X(t)");
-	plot!(; xlims=(ts[1:1000][1],ts[1:1000][end])) |> as_svg
-end
+# ╔═╡ 80b490a8-4e8f-4ea2-9384-f68bd94c255c
+plot(Nn)
 
-# ╔═╡ f38836f0-56de-4a9d-9882-39bc3cfcadcd
-md"
-
-## 2. LTI Systems and Random Processes
-
-Now, we consider a a linear time-invariant (LTI) filter with impulse response $$h(t) = e^{-at}(u(t)-u(t-20))$$, i.e., a truncated RC low-pass filter with parameter $$a$$ that is cut to zero for $$t>20$$ seconds. The input to the system will be the bandlimited WGN process, $$X(t)$$, produced above and the output random process, $$Y(t)$$, is a modified or an approximate Ornstein-Uhlenbeck process due to the time-windowed $$h(t)$$.
-
-From analysis of deterministic signals and systems, we know that the output random process $$Y(t) = X(t) \ast h(t)$$ which is the continuous-time convolution of the input random process and the impulse response. For computational purposes, we can approximate it as a Riemann integral,
-
-$$Y(t) \approx \displaystyle\sum_{k=-\infty}^{\infty}X(t-\tau)e^{-a\tau}(u(\tau)-u(\tau-20))d\tau,$$
-
-where for the purpose numerical approximation of $$X(t)$$, following section 1, we take $$\tau_t(k) = \left(t - \lfloor t/T \rfloor\right) + k\Delta t$$ for which $$d\tau_t(k) = \Delta t$$. Also note that since h(t) is truncated, the maximum range of the samples will correspond to $$20/\Delta t$$ and will only be non-zero for $$k>0$$. Thus, we get,
-
-$$Y(t) \approx \displaystyle\sum_{k=0}^{20/\Delta t}X(\lfloor t/T \rfloor - k\Delta t)e^{-a\left(\left(t - \lfloor t/T \rfloor\right) + k\Delta t\right)}\Delta t.$$
-
-We implement the process $$Y(t)$$ in the code below and plot it for different values of the parameter $$a$$.
-
-"
-
-# ╔═╡ 52e5db27-c47d-4f06-90d5-8e7c71a676da
-τₜ(t, k) = (t - kₜ(t)) + k*Δt
-
-# ╔═╡ 4b800460-de8a-4ca2-a772-99712febcc9a
-Y(t, Xₖ, a, T, m) = sum([Xₜ(t-τₜ(t, k), Xₖ, T, m)*exp(-a*τₜ(t, k)) for k ∈ 0:20/Δt])*Δt
-
-# ╔═╡ 00ed51bb-7b14-4bc9-9884-55922d7a0e73
-begin
-	a₁ = 0; a₂ = 0.2; # h(t) = exp(-aᵢt) for 0 < t < 20
-	Yt(t, a) = Y(t, Xk, a, T, m);
-end
-
-# ╔═╡ 6b669b5c-621c-4f7b-8708-ace0bdf69c0b
-begin
-	Yt₁(t) = Yt(t, a₁);
-	plot(ts, Yt₁.(ts); legend=false) 
-	xlabel!("Time [s]");
-	ylabel!("Amplitude");
-	title!(L"Y(t; a=0)");
-	plot!(; xlims=(ts[1],ts[end])) |> as_svg
-end
-
-# ╔═╡ 6e2f23be-56f9-4392-b4e7-f09e0a014385
-begin
-	Yt₂(t) = Yt(t, a₂);
-	plot(ts, Yt₂.(ts); legend=false)
-	xlabel!("Time [s]");
-	ylabel!("Amplitude");
-	title!(L"Y(t; a=0.2)");
-	plot!(; xlims=(ts[1],ts[end])) |> as_svg
-end
-
-# ╔═╡ 322f42cc-69cb-4a38-8687-21d7eeaa1b22
-md"
-
-## 3. Power Spectral Density of Random Processes
-
-For LTI systems, we have the following statistical result,
-
-$$S_Y(f) = S_X(f)|H(f)|^2,$$
-
-where $$S(f)$$ is the power spectral density (PSD) of the respective signals and $$H(f)$$ is the Fourier transform of the impulse response. Recall that, in section 1, we have treated $$X_k$$ as samples of $$X(t)$$ every $$T$$ second intervals. For a bandlimited WGN process we have the result that the samples $$X_k \sim \mathcal{N}(0, N_0B)$$ where $$N_0=2$$ is the net power of the signal $$X(t)$$ and $$B=\frac{1}{2}$$ is its bandwidth. Therefore, we have $$S_X(f) = 1 = \frac{N_0}{2}$$ for $$|f| < \frac{1}{2}$$. Furthermore, we have $$H(f) = \frac{1-e^{-20(a + j2\pi f)}}{a + j2\pi f}$$, and to get the squared magnitude of $$H$$, we multiply it with its conjugate $$H^*$$. Finally, we have,
-
-$$|H(f)|^2 = \frac{1 + e^{-20a}(e^2 - 2\cos(40\pi f))}{a^2 + 4\pi^2f^2}$$
-
-We expect $$S_Y(f) = \frac{N_0}{2}|H(f)|^2 = |H(f)|^2$$, for $$|f| < \frac{1}{2}$$ and zero elsewhere. Thus, the theoretical PSDs of $$Y(t)$$ for filters with different values of parameter $$a$$ are,
-
-$$S_Y(f) = 
-\begin{cases}
-\begin{align}
-	\frac{1 + (e^2 - 2\cos(40\pi f))}{4\pi^2f^2}, & \quad a = 0\\
-	\frac{1 + e^{-4}(e^2 - 2\cos(40\pi f))}{0.04 + 4\pi^2f^2}, & \quad a = 0.2
-\end{align}
-\end{cases}$$
-
-Note that for for $$a=0$$, $$S_Y$$ is unbounded near $$f=0$$, whereas for $$a=0.2$$ it only reaches a maximum of $$\approx 27.46$$ at $$0$$ Hz. We have created a function to get the theoretical PSD for $$Y(t)$$ below.
-
-"
-
-# ╔═╡ cbd16f03-de57-431f-9d3b-ae003200b996
-Sthᵧ(f, a) = (1 + exp(-20a)*(exp(2) - 2*cos(40π*f)))/(a^2 + 4π^2*f^2) * (f < 1/2)
-
-# ╔═╡ 806f3a8a-38b1-4384-95d0-5aeb222fa0ff
-md"
-
-## 4. PSD from Sample Functions
-
-We can get an estimate of the PSD of a process from its sample functions. For a good estimate of the signal spectrum, we make the signal length larger (or have more samples). Since $$Y(t)$$ is bandlimited at $$0.5$$ Hz, we can only the signal sample every second at a minimum. For this section, we chose to sample at the Nyquist rate of $$1$$ Hz and sample over $$t \in [0, 2^{13}-1]$$ seconds, yielding $$N=2^{13}$$ samples, which is a power of $$2$$, to not include any artificial distortion due to FFT. We use the `periodogram` function in [DSP.jl](https://github.com/JuliaDSP/DSP.jl) package to get the PSD estimates $$\hat{S}_Y(f)$$ from the time-domain samples of the signal, and have plotted the results below.
-
-"
-
-# ╔═╡ 90e6a6af-8be0-45ea-b1c7-9d4139d27977
-Sᵧ₁ = periodogram(Yt₁.(0:1/T:2^13T-T); fs=1/T)
-
-# ╔═╡ 6b95c142-5fda-4734-95bc-2c9272bc506b
-begin
-	plot(Sᵧ₁.freq, Sᵧ₁.power; legend=false)
-	xlabel!("Frequency [Hz]");
-	ylabel!("Power");
-	title!(L"\hat{S}_Y(f; a = 0)");
-	plot!(; xlims=(Sᵧ₁.freq[1],Sᵧ₁.freq[end]), ylims=(0, maximum(Sᵧ₁.power))) |> as_svg
-end
-
-# ╔═╡ 95ed5cdb-333e-4f58-8947-62a1708b2dac
-Sᵧ₂ = periodogram(Yt₂.(0:1/T:2^13T-T); fs=1/T)
-
-# ╔═╡ 06f05a08-0739-45d4-b60f-7f36f299e99e
-begin
-	plot(Sᵧ₂.freq, Sᵧ₂.power; legend=false)
-	xlabel!("Frequency [Hz]");
-	ylabel!("Power");
-	title!(L"\hat{S}_Y(f; a = 0.2)");
-	plot!(; xlims=(Sᵧ₂.freq[1],Sᵧ₂.freq[end]), ylims=(0, maximum(Sᵧ₂.power))) |> as_svg
-end
-
-# ╔═╡ 8fc09b76-ccc8-4c8d-a904-97c93a41e3dd
-md"
-
-## 5. PSD Estimation over Ensembles
-
-We can get closer estimates of the true PSD, $$S_Y(f)$$ by taking the ensemble average of (the random process) $$\hat{S}_Y(f)$$. This is also the statistical definition of PSD. Here, we consider an ensemble of $$N = 20$$ i.i.d. signals $$Y(t)$$ and plot the estimated and true PSDs below.
-
-"
-
-# ╔═╡ aa9180dc-e39e-4ac9-a9bc-ce9fb044cc2f
-N = 20;
-
-# ╔═╡ 10b8e2cf-1d59-49aa-a1d3-ea806da99ab1
-Xks = [rand.(Xₖ(20_000)) for i ∈ 1:N];
-
-# ╔═╡ a20cc1fd-0ba2-46de-83e0-504c496c154e
-begin
-	Yts₁ = [[Y(t, Xks[i], a₁, T, m) for t ∈ 0:1/T:2^13T-T] for i ∈ 1:N];
-	Ssᵧ₁ = [periodogram(Yts₁[i]; fs=1/T) for i ∈ 1:N];
-	Pavg₁ = mean(hcat((Ssᵧ₁.|> power)...); dims=2);
-end
-
-# ╔═╡ 32f3776a-74d6-454b-b799-b849151302db
-begin
-	Yts₂ = [[Y(t, Xks[i], a₂, T, m) for t ∈ 0:1/T:2^13T-T] for i ∈ 1:N];
-	Ssᵧ₂ = [periodogram(Yts₂[i]; fs=1/T) for i ∈ 1:N];
-	Pavg₂ = mean(hcat((Ssᵧ₂.|> power)...); dims=2);
-end
-
-# ╔═╡ 1d5af6f7-4f7b-48bc-a847-2e8cb90cc67a
-freq₁ = Ssᵧ₁[1].freq;
-
-# ╔═╡ 53e726cc-b381-4125-82e1-71ee47d2cd3f
-freq₂ = Ssᵧ₂[1].freq;
-
-# ╔═╡ c5963cce-c7f5-43e7-a843-457990ae7095
-begin
-	Sthᵧ₁(f) = Sthᵧ(f, 0);
-	freq_idx₁= findfirst(x -> (x > 0.013), freq₁);
-	plot(freq₁, Pavg₁; label=L"\hat{S}_Y(f\:; a=0)")
-	plot!(freq₁[freq_idx₁:end], Sthᵧ₁.(freq₁[freq_idx₁:end]); label=L"S_Y(f\:; a=0)") 
-	xlabel!("Frequency [Hz]");
-	ylabel!("Power");
-	title!("Theoretical and Estimated PSDs for Y(t; a=0)");
-	plot!(; xlims=(freq₁[1],freq₁[end]), ylims=(0, maximum(Pavg₁))) |> as_svg
-end
-
-# ╔═╡ c3e72283-8fd6-458f-ade6-dc16dc6283fa
-begin
-	Sthᵧ₂(f) = Sthᵧ(f, 0.2);
-	freq_idx₂= 1;
-	plot(freq₂, Pavg₂; label=L"\hat{S}_Y(f\:; a=0.2)")
-	plot!(freq₂[freq_idx₂:end], Sthᵧ₂.(freq₂[freq_idx₂:end]); label=L"S_Y(f\:; a=0.2)")
-	xlabel!("Frequency [Hz]");
-	ylabel!("Power");
-	title!("Theoretical and Estimated PSDs for Y(t; a=0.2)");
-	plot!(; xlims=(freq₂[1],freq₂[end]), ylims=(0, maximum(Pavg₂))) |> as_svg
-end
-
-# ╔═╡ 4974b7ab-28ac-4d0f-b9cb-a0bdac26238a
-md"
-
-## 6. Ergodicity, Autocorrelation, and PSDs
-
-Since $$Y(t)$$ is a Guassian process arising from bandlimited WGN, it is wide-sense stationary (WSS) and ergodic (at least in the mean-square sense). We can see this as its autocorrelation goes to zero quickly and it has an almost-constant mean (not tested here), but can be shown. We first apply the ergodic property of the $$Y(t)$$ to estimate the autocorrelation of the process in general, i.e., we use a single realization of the process to determine its mean, variance and autocorrelation. Then, by the Wiener Khinchin Theorem, we get the PSD of the WSS random process, $$Y(t)$$ from the Fourier transform of its autocorrelation function. We do this over a large time-series with $$t\in [0, 10^5]$$ seconds (for more accuracy) and plot the results below.
-
-"
-
-# ╔═╡ 32ecb867-1835-4ac7-8601-d2794e07995d
-begin
-	Xk_l      = rand.(Xₖ(101_000));
-	ts_l      = 0:1/T:100_000T;
-	Yt_l₂(t)  = Y(t, Xk_l, a₂, T, m);
-	Ysamples₂ = Yt_l₂.(ts_l);
-	acfY₂     = autocor(Ysamples₂, 0:length(Ysamples₂)-1);
-end
-
-# ╔═╡ 645b9166-d2fa-4a9a-8117-553719834a4f
-plot(ts_l, acfY₂; legend=false, ylabel="Normalized Values", xlabel="Lag [s]", title=L"\hat{R}_{YY}(\tau)") |> as_svg
-
-# ╔═╡ 8f903097-1e59-4fec-872f-ce7f66cecfcd
-Ŝᵧ₂  = fft(acfY₂) |> fftshift
-
-# ╔═╡ 959b2542-e693-4c7f-93e0-e57267e02379
-begin
-	Nsig = length(Ŝᵧ₂);
-	freq = fftfreq(Nsig, 1/T) |> fftshift
-	plot(freq[Nsig÷2:end],abs.(Ŝᵧ₂)[Nsig÷2:end]; label=L"\hat{S}_Y(f\:; a=0.2)") 
-	plot!(freq[Nsig÷2:end], Sthᵧ₂.(freq[Nsig÷2:end]); label=L"S_Y(f\:; a=0.2)")
-	xlabel!("Frequency [Hz]");
-	ylabel!("Power");
-	title!("Theoretical and Estimated PSDs for Y(t; a=0.2)");
-	plot!(; xlims=(freq[Nsig÷2:end][1],freq[Nsig÷2:end][end]), 
-		ylims=(0, maximum(abs.(Ŝᵧ₂)))) |> as_svg
-end
-
-# ╔═╡ a62980d6-42c3-440c-a8fa-ffbecb35827a
-md"
-
-## 7. Code
-
-Note that this lab report can be run on the cloud and viewed as is on the github repository page [here](https://pranshumalik14.github.io/ece537-labs/lab4/lab4.jl.html). All code for the notebook can be accessed [here](https://github.com/pranshumalik14/ece537-labs).
-
-"
+# ╔═╡ 853c71f4-0298-4037-9c49-414dea8661f8
+plot(Xn)
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
@@ -324,12 +71,12 @@ PlutoUI = "7f904dfe-b85e-4ff6-b463-dae2292396a8"
 StatsBase = "2913bbd2-ae8a-5f71-8c99-4fb6c76f3a91"
 
 [compat]
-DSP = "~0.7.3"
+DSP = "~0.7.4"
 Distributions = "~0.25.34"
 FFTW = "~1.4.5"
 LaTeXStrings = "~1.3.0"
-Plots = "~1.24.2"
-PlutoUI = "~0.7.20"
+Plots = "~1.25.1"
+PlutoUI = "~0.7.21"
 StatsBase = "~0.33.13"
 """
 
@@ -345,9 +92,9 @@ version = "1.0.1"
 
 [[AbstractPlutoDingetjes]]
 deps = ["Pkg"]
-git-tree-sha1 = "0bc60e3006ad95b4bb7497698dd7c6d649b9bc06"
+git-tree-sha1 = "abb72771fd8895a7ebd83d5632dc4b989b022b5b"
 uuid = "6e696c72-6542-2067-7265-42206c756150"
-version = "1.1.1"
+version = "1.1.2"
 
 [[Adapt]]
 deps = ["LinearAlgebra"]
@@ -378,9 +125,9 @@ version = "1.16.1+0"
 
 [[ChainRulesCore]]
 deps = ["Compat", "LinearAlgebra", "SparseArrays"]
-git-tree-sha1 = "f885e7e7c124f8c92650d61b9477b9ac2ee607dd"
+git-tree-sha1 = "4c26b4e9e91ca528ea212927326ece5918a04b47"
 uuid = "d360d2e6-b24c-11e9-a2a3-2a2ae2dbcce4"
-version = "1.11.1"
+version = "1.11.2"
 
 [[ChangesOfVariables]]
 deps = ["LinearAlgebra", "Test"]
@@ -424,9 +171,9 @@ version = "0.5.7"
 
 [[DSP]]
 deps = ["Compat", "FFTW", "IterTools", "LinearAlgebra", "Polynomials", "Random", "Reexport", "SpecialFunctions", "Statistics"]
-git-tree-sha1 = "1edc3eb6cd0ec2b5193ac6d37c1b1310044550fe"
+git-tree-sha1 = "fe2287966e085df821c0694df32d32b6311c6f4c"
 uuid = "717857b8-e6f2-59f4-9121-6e50c889abd2"
-version = "0.7.3"
+version = "0.7.4"
 
 [[DataAPI]]
 git-tree-sha1 = "cc70b17275652eb47bc9e5f81635981f13cea5c8"
@@ -639,9 +386,9 @@ version = "0.5.0"
 
 [[InlineStrings]]
 deps = ["Parsers"]
-git-tree-sha1 = "19cb49649f8c41de7fea32d089d37de917b553da"
+git-tree-sha1 = "ca99cac337f8e0561c6a6edeeae5bf6966a78d21"
 uuid = "842dd82b-1e85-43dc-bf29-5d0ee9dffc48"
-version = "1.0.1"
+version = "1.1.0"
 
 [[IntelOpenMP_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
@@ -671,9 +418,9 @@ uuid = "92d709cd-6900-40b7-9082-c6be49f344b6"
 version = "0.1.1"
 
 [[IterTools]]
-git-tree-sha1 = "05110a2ab1fc5f932622ffea2a003221f4782c18"
+git-tree-sha1 = "fa6287a4469f5e048d763df38279ee729fbd44e5"
 uuid = "c8e1da08-722c-5040-9ed9-7db0dc04731e"
-version = "1.3.0"
+version = "1.4.0"
 
 [[IteratorInterfaceExtensions]]
 git-tree-sha1 = "a3f24677c21f5bbe9d2a714f95dcd58337fb2856"
@@ -943,15 +690,15 @@ version = "1.0.15"
 
 [[Plots]]
 deps = ["Base64", "Contour", "Dates", "Downloads", "FFMPEG", "FixedPointNumbers", "GR", "GeometryBasics", "JSON", "Latexify", "LinearAlgebra", "Measures", "NaNMath", "PlotThemes", "PlotUtils", "Printf", "REPL", "Random", "RecipesBase", "RecipesPipeline", "Reexport", "Requires", "Scratch", "Showoff", "SparseArrays", "Statistics", "StatsBase", "UUIDs", "UnicodeFun"]
-git-tree-sha1 = "93f484f18848234ac2c1387c7e5263f840cdafe3"
+git-tree-sha1 = "3e7e9415f917db410dcc0a6b2b55711df434522c"
 uuid = "91a5bcdd-55d7-5caf-9e0b-520d859cae80"
-version = "1.24.2"
+version = "1.25.1"
 
 [[PlutoUI]]
 deps = ["AbstractPlutoDingetjes", "Base64", "Dates", "Hyperscript", "HypertextLiteral", "IOCapture", "InteractiveUtils", "JSON", "Logging", "Markdown", "Random", "Reexport", "UUIDs"]
-git-tree-sha1 = "1e0cb51e0ccef0afc01aab41dc51a3e7f781e8cb"
+git-tree-sha1 = "b68904528fd538f1cb6a3fbc44d2abdc498f9e8e"
 uuid = "7f904dfe-b85e-4ff6-b463-dae2292396a8"
-version = "0.7.20"
+version = "0.7.21"
 
 [[Polynomials]]
 deps = ["Intervals", "LinearAlgebra", "MutableArithmetics", "RecipesBase"]
@@ -1126,10 +873,10 @@ deps = ["InteractiveUtils", "Logging", "Random", "Serialization"]
 uuid = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [[TimeZones]]
-deps = ["Dates", "Downloads", "InlineStrings", "LazyArtifacts", "Mocking", "Pkg", "Printf", "RecipesBase", "Serialization", "Unicode"]
-git-tree-sha1 = "8de32288505b7db196f36d27d7236464ef50dba1"
+deps = ["Dates", "Downloads", "InlineStrings", "LazyArtifacts", "Mocking", "Printf", "RecipesBase", "Serialization", "Unicode"]
+git-tree-sha1 = "ce5aab0b0146b81efefae52f13002e19c2af57ac"
 uuid = "f269a46b-ccf7-5d73-abea-4c690281aa53"
-version = "1.6.2"
+version = "1.7.0"
 
 [[URIs]]
 git-tree-sha1 = "97bbe755a53fe859669cd907f2d96aee8d2c1355"
@@ -1361,47 +1108,15 @@ version = "0.9.1+5"
 """
 
 # ╔═╡ Cell order:
-# ╟─eefea893-c3ad-4d6c-90fe-81b115704554
-# ╟─a464cbae-5084-11ec-1200-61caa9151191
-# ╠═c5fc5ae8-bb04-4e6a-abd2-11111ef7e7ab
-# ╟─14f33cc4-ad48-4ca7-8472-a6b2b28cd72e
-# ╠═b2d803e8-d32a-4a5c-be74-2ec90c93856f
-# ╠═9b06c067-34b8-4ce1-b758-eeaad0e13c27
-# ╠═9780daba-15fa-49f1-b715-afedd5298885
-# ╠═1dd7c43f-e6f8-4736-b193-8eeb06e36f3e
-# ╠═75328846-d08d-406e-9c7a-825a39a57a87
-# ╠═942d6539-9c24-4769-82ef-32bd89e43da6
-# ╠═44fe2fa1-0b27-4f5f-a136-c203a2b9ceb4
-# ╟─6b410b33-2d45-4f32-821b-ef15ba1b53e1
-# ╟─3cea316b-4f53-4416-b27f-3752feb3bef5
-# ╟─2e4863fa-1a75-4c56-ad51-0bc9efcae433
-# ╟─f38836f0-56de-4a9d-9882-39bc3cfcadcd
-# ╠═52e5db27-c47d-4f06-90d5-8e7c71a676da
-# ╠═4b800460-de8a-4ca2-a772-99712febcc9a
-# ╠═00ed51bb-7b14-4bc9-9884-55922d7a0e73
-# ╟─6b669b5c-621c-4f7b-8708-ace0bdf69c0b
-# ╟─6e2f23be-56f9-4392-b4e7-f09e0a014385
-# ╟─322f42cc-69cb-4a38-8687-21d7eeaa1b22
-# ╠═cbd16f03-de57-431f-9d3b-ae003200b996
-# ╟─806f3a8a-38b1-4384-95d0-5aeb222fa0ff
-# ╠═90e6a6af-8be0-45ea-b1c7-9d4139d27977
-# ╟─6b95c142-5fda-4734-95bc-2c9272bc506b
-# ╠═95ed5cdb-333e-4f58-8947-62a1708b2dac
-# ╟─06f05a08-0739-45d4-b60f-7f36f299e99e
-# ╟─8fc09b76-ccc8-4c8d-a904-97c93a41e3dd
-# ╠═aa9180dc-e39e-4ac9-a9bc-ce9fb044cc2f
-# ╠═10b8e2cf-1d59-49aa-a1d3-ea806da99ab1
-# ╠═a20cc1fd-0ba2-46de-83e0-504c496c154e
-# ╠═32f3776a-74d6-454b-b799-b849151302db
-# ╠═1d5af6f7-4f7b-48bc-a847-2e8cb90cc67a
-# ╠═53e726cc-b381-4125-82e1-71ee47d2cd3f
-# ╟─c5963cce-c7f5-43e7-a843-457990ae7095
-# ╟─c3e72283-8fd6-458f-ade6-dc16dc6283fa
-# ╟─4974b7ab-28ac-4d0f-b9cb-a0bdac26238a
-# ╠═32ecb867-1835-4ac7-8601-d2794e07995d
-# ╟─645b9166-d2fa-4a9a-8117-553719834a4f
-# ╠═8f903097-1e59-4fec-872f-ce7f66cecfcd
-# ╟─959b2542-e693-4c7f-93e0-e57267e02379
-# ╟─a62980d6-42c3-440c-a8fa-ffbecb35827a
+# ╟─a69e382a-b1ee-4a83-a15d-e83a9632a8c2
+# ╟─6848b622-5812-11ec-3f59-0349783c79cf
+# ╠═94386ab7-391b-45e0-8e57-123a2b3ff913
+# ╟─03871828-cfeb-41fa-b6ee-7e74ad056d6e
+# ╠═bcb9b4fa-2087-4ec8-affe-ad736f4296ca
+# ╠═7d6a5b3a-5b43-4d45-bc7a-443d209a006c
+# ╠═fdea5673-5d95-41fe-90e8-dd0bed409d49
+# ╠═d980f36c-7de2-4cb2-8b04-48c5406cc55e
+# ╠═80b490a8-4e8f-4ea2-9384-f68bd94c255c
+# ╠═853c71f4-0298-4037-9c49-414dea8661f8
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
