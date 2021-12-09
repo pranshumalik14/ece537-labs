@@ -25,11 +25,11 @@ Throughout this lab, the [Distributions.jl](https://github.com/JuliaStats/Distri
 # ╔═╡ 03871828-cfeb-41fa-b6ee-7e74ad056d6e
 md"
 
-## 1. Autoregressive Filters
+## 1. Predicting Autoregressive Filters
 
-Here we consider a system excited by white noise (input) and produces a random sequence $$X_n$$ as output by the following relation,
+Here we consider a system excited by white noise input $$N_n \sim \mathcal{N}(0, 1)$$ and produces a random sequence $$X_n$$ as output by the following relation,
 
-$$X_n = 1.5X_{n-1} - 0.8X_{n-2} + N_n.$$
+$$X_n = 1.5X_{n-1} - 0.8X_{n-2} + N_n$$
 
 "
 
@@ -46,17 +46,166 @@ function Xₙ(Nn)
 	return Xn
 end
 
+# ╔═╡ 702737f6-9b24-42f6-8cb4-3bd0dfc00d54
+function autocorr(X; nlags=nothing)
+	n = length(X); L = (nlags === nothing) ? n-1 : 
+		((nlags < n) ? nlags : throw(AssertionError("nlags > n-1"))); 
+	Rₓ = zeros(L+1);               # initial length = number of lags
+	
+	for m ∈ 1:L+1
+		for k ∈ 1:n-m+1
+			Rₓ[m] += X[k]*X[k+m-1] # add product terms
+		end
+		Rₓ[m] /= n-m+1             # normalize by number of terms
+	end
+
+	Rₓ = [reverse(Rₓ[2:end]); Rₓ]; # all lags [-L to L]
+end
+
 # ╔═╡ fdea5673-5d95-41fe-90e8-dd0bed409d49
 Nn = rand.(Nₙ(600));
 
 # ╔═╡ d980f36c-7de2-4cb2-8b04-48c5406cc55e
-Xn = Xₙ(Nn);
+Xn = Xₙ(Nn)[89:end]; # using only the last 512 samples
 
 # ╔═╡ 80b490a8-4e8f-4ea2-9384-f68bd94c255c
-plot(Nn)
+plot(Nn; legend=false)
 
 # ╔═╡ 853c71f4-0298-4037-9c49-414dea8661f8
-plot(Xn)
+plot(Xn; legend=false)
+
+# ╔═╡ c819f061-3475-4ae3-ae0c-c21744d5211e
+Rₙ = autocorr(Nn; nlags=50); Rₓ = autocorr(Xn; nlags=50);
+
+# ╔═╡ 76e66f3f-e7c1-45fd-9e24-c5efd5cec49d
+plot(Rₙ; title=L"\hat{R}_{NN}(\tau)", legend=false, xticks=(1:10:102, -50:10:51))
+
+# ╔═╡ 039e4e9b-292c-48f5-abe2-76f7e04f0718
+plot(Rₓ; title=L"\hat{R}_{XX}(\tau)", legend=false, xticks=(1:10:102, -50:10:51))
+
+# ╔═╡ 2ffec40b-eb94-4cd3-9212-096e9cd93c99
+md"
+
+10 realizations and periodogram.
+
+"
+
+# ╔═╡ d5758039-65ff-4f90-ae41-a4932c725c22
+Nns = [rand.(Nₙ(600)) for i ∈ 1:10];
+
+# ╔═╡ 6192ac4f-d1e4-4c09-8670-51b7c80ade68
+begin
+	Xns  = [Xₙ(Nns[i])[89:end] for i ∈ 1:10];
+	Ssₓ  = [periodogram(Xns[i]) for i ∈ 1:10];
+	Pavgₓ = mean(hcat((Ssₓ.|> power)...); dims=2);
+end
+
+# ╔═╡ bc430571-c413-4bee-bac4-25508a283992
+freqₓ = Ssₓ[1].freq;
+
+# ╔═╡ 59e78499-a1ab-42fa-b2a5-d37781652fb7
+md"
+
+Here, we take a step back and consider a general AR filter given by,
+
+$$X_n = −\sum_{p=1}^{P}a_pX_{n-p} + N_n$$
+
+For this formulation of an AR filter, we have its Z-transform given by, $$H(z) = \frac{1}{A(z)}$$, where,
+
+$$A(z) = 1 + \sum_{p=1}^Pa_pz^{-p}$$
+
+Thus, the output spectral density is given by,
+
+$$S_X(f) = \sigma_N^2\frac{1}{|A(f)|^2}$$
+
+In our case, we have $$H(z) = \frac{1}{1-1.5z^{-1} + 0.8z^{-2}}$$ and we get its magnitude response using the `freqresp` fucntion in the [DSP.jl](https://github.com/JuliaDSP/DSP.jl) package.
+
+"
+
+# ╔═╡ a0550cf5-0451-475b-bb20-1de14182e274
+H, ω = freqresp(PolynomialRatio([1.0], [1.0, -1.5, 0.8]));
+
+# ╔═╡ db7e534b-42ad-465e-a9df-9e7a97859591
+begin
+	plot(freqₓ, Pavgₓ; label=L"\hat{S}_X(f)")
+	plot!(ω./2π, abs2.(H); label=L"S_X(f)")
+	xlabel!("Frequency [Hz]");
+	ylabel!("Power");
+	title!("Theoretical and Estimated PSDs for X[n]");
+	plot!(; xlims=(freqₓ[1],freqₓ[end]), ylims=(0, maximum(Pavgₓ))) |> as_svg
+end
+
+# ╔═╡ fc05f712-7072-4ed8-aaaa-d04e6387cc8f
+Ŝₓ = fft(Rₓ) |> fftshift;
+
+# ╔═╡ 041a791a-2f30-4912-b937-64c8879e8829
+let
+	Nsigₓ = length(Ŝₓ);
+	freqₓ = fftfreq(Nsigₓ) |> fftshift;
+	plot(freqₓ[Nsigₓ÷2:end],abs.(Ŝₓ)[Nsigₓ÷2:end]; label=L"\hat{S}_X(f)")
+	xlabel!("Frequency [Hz]");
+	ylabel!("Power");
+	title!("Wiener-Khinchin PSD Estimate for X[n]");
+end
+
+# ╔═╡ 0ed9d1b4-87d3-4ea8-8315-9532702db7c1
+# yule-walker
+
+# ╔═╡ da88045d-31b3-4826-a18b-d5099a731df4
+md"
+
+## 2. Predicting Another Autoregressive Filter
+
+Here we consider a system excited by white noise (input) and produces a random sequence $$X_n$$ as output by the following relation,
+
+$$S_n = 0.2S_{n-1} - 0.8X_{n-2} + N_n$$
+
+"
+
+# ╔═╡ b6afa337-8ca0-4518-a03c-0df78c5d254f
+function Sₙ(Nn)
+	n = length(Nn); Sn = zeros(n);
+	Sn[1] = Nn[1]; Sn[2] = 0.2Nn[1]+Nn[2];
+	
+	for k ∈ 3:n  Sn[k] = 0.2Sn[k-1] - 0.8Sn[k-2] + Nn[k]  end
+
+	return Sn
+end
+
+# ╔═╡ 76657d61-252a-4242-ba7c-fdb25a13e69b
+
+
+# ╔═╡ 124ef33c-7c5e-43bf-b86c-7ee91200e82b
+# todo: prove/motivate why S, X are jointly WSS to be able to use 1var crosscorr
+
+# ╔═╡ 23a2b949-c9ab-46e6-be1e-783c233522a7
+function crosscorr(X, Y; nlags=nothing)
+	nₓ = length(X); nᵧ = length(Y); n = min(nₓ, nᵧ);
+	L = (nlags === nothing) ? n-1 : 
+		((nlags < n) ? nlags : throw(AssertionError("nlags > min(nₓ, nᵧ)-1"))); 
+	Rₓᵧ = zeros(L+1);                 # initial length = number of lags
+	
+	for m ∈ 1:L+1
+		for k ∈ 1:n-m+1
+			Rₓᵧ[m] += X[k]*Y[k+m-1]   # add product terms
+		end
+		Rₓᵧ[m] /= n-m+1               # normalize by number of terms
+	end
+
+	Rₓᵧ = [reverse(Rₓᵧ[2:end]); Rₓᵧ]; # all lags [-L to L]
+end
+
+# ╔═╡ 907b751b-2c3d-413c-a3f4-77fd2631cc59
+# wiener-hopf
+
+# ╔═╡ 32a99590-76a6-4207-ab7a-c47aa791750a
+md"
+
+## 3. Code
+
+Note that this lab report can be run on the cloud and viewed as is on the github repository page [here](https://pranshumalik14.github.io/ece537-labs/lab5/lab5.jl.html). All code for the notebook can be accessed [here](https://github.com/pranshumalik14/ece537-labs).
+
+"
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
@@ -1118,5 +1267,26 @@ version = "0.9.1+5"
 # ╠═d980f36c-7de2-4cb2-8b04-48c5406cc55e
 # ╠═80b490a8-4e8f-4ea2-9384-f68bd94c255c
 # ╠═853c71f4-0298-4037-9c49-414dea8661f8
+# ╠═702737f6-9b24-42f6-8cb4-3bd0dfc00d54
+# ╠═c819f061-3475-4ae3-ae0c-c21744d5211e
+# ╠═76e66f3f-e7c1-45fd-9e24-c5efd5cec49d
+# ╠═039e4e9b-292c-48f5-abe2-76f7e04f0718
+# ╟─2ffec40b-eb94-4cd3-9212-096e9cd93c99
+# ╠═d5758039-65ff-4f90-ae41-a4932c725c22
+# ╠═6192ac4f-d1e4-4c09-8670-51b7c80ade68
+# ╠═bc430571-c413-4bee-bac4-25508a283992
+# ╟─59e78499-a1ab-42fa-b2a5-d37781652fb7
+# ╠═a0550cf5-0451-475b-bb20-1de14182e274
+# ╟─db7e534b-42ad-465e-a9df-9e7a97859591
+# ╠═fc05f712-7072-4ed8-aaaa-d04e6387cc8f
+# ╟─041a791a-2f30-4912-b937-64c8879e8829
+# ╠═0ed9d1b4-87d3-4ea8-8315-9532702db7c1
+# ╟─da88045d-31b3-4826-a18b-d5099a731df4
+# ╠═b6afa337-8ca0-4518-a03c-0df78c5d254f
+# ╠═76657d61-252a-4242-ba7c-fdb25a13e69b
+# ╠═124ef33c-7c5e-43bf-b86c-7ee91200e82b
+# ╠═23a2b949-c9ab-46e6-be1e-783c233522a7
+# ╠═907b751b-2c3d-413c-a3f4-77fd2631cc59
+# ╟─32a99590-76a6-4207-ab7a-c47aa791750a
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
