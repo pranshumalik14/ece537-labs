@@ -25,7 +25,7 @@ Throughout this lab, the [Distributions.jl](https://github.com/JuliaStats/Distri
 # ╔═╡ 03871828-cfeb-41fa-b6ee-7e74ad056d6e
 md"
 
-## 1. Predicting Autoregressive Filters
+## 1. Autoregressive Filters and Coefficient Estimation
 
 Here we consider a system excited by white noise input $$N_n \sim \mathcal{N}(0, 1)$$ and produces a random sequence $$X_n$$ as output by the following relation,
 
@@ -59,7 +59,7 @@ plot(Nn; legend=false)
 plot(Xn; legend=false)
 
 # ╔═╡ 702737f6-9b24-42f6-8cb4-3bd0dfc00d54
-function autocorr(X; nlags=nothing)
+function autocorr(X; nlags=nothing) # assumes ergodicity of X
 	n = length(X); L = (nlags === nothing) ? n-1 : 
 		((0 < nlags < n) ? nlags : throw(AssertionError("0 ≮ nlags ≰ n-1"))); 
 	Rₓ = zeros(L+1);                # initial length = number of lags
@@ -75,13 +75,13 @@ function autocorr(X; nlags=nothing)
 end
 
 # ╔═╡ c819f061-3475-4ae3-ae0c-c21744d5211e
-Rₙ = autocorr(Nn; nlags=50); Rₓ = autocorr(Xn; nlags=50);
+Rₙₙ = autocorr(Nn; nlags=50); Rₓₓ = autocorr(Xn; nlags=50);
 
 # ╔═╡ 76e66f3f-e7c1-45fd-9e24-c5efd5cec49d
-plot(Rₙ; title=L"\hat{R}_{NN}(\tau)", legend=false, xticks=(1:10:101, -50:10:50))
+plot(Rₙₙ; title=L"\hat{R}_{NN}(\tau)", legend=false, xticks=(1:10:101, -50:10:50))
 
 # ╔═╡ 039e4e9b-292c-48f5-abe2-76f7e04f0718
-plot(Rₓ; title=L"\hat{R}_{XX}(\tau)", legend=false, xticks=(1:10:101, -50:10:50))
+plot(Rₓₓ; title=L"\hat{R}_{XX}(\tau)", legend=false, xticks=(1:10:101, -50:10:50))
 
 # ╔═╡ 2ffec40b-eb94-4cd3-9212-096e9cd93c99
 md"
@@ -95,13 +95,13 @@ Nns = [rand.(Nₙ(600)) for i ∈ 1:10];
 
 # ╔═╡ 6192ac4f-d1e4-4c09-8670-51b7c80ade68
 begin
-	Xns  = [Xₙ(Nns[i])[89:end] for i ∈ 1:10];
-	Ssₓ  = [periodogram(Xns[i]) for i ∈ 1:10];
-	Pavgₓ = mean(hcat((Ssₓ.|> power)...); dims=2);
+	Xns   = [Xₙ(Nns[i])[89:end] for i ∈ 1:10];
+	Ssₓₓ  = [periodogram(Xns[i]) for i ∈ 1:10];
+	Pavgₓ = mean(hcat((Ssₓₓ.|> power)...); dims=2);
 end
 
 # ╔═╡ bc430571-c413-4bee-bac4-25508a283992
-freqₓ = Ssₓ[1].freq;
+freqₓ = Ssₓₓ[1].freq;
 
 # ╔═╡ 59e78499-a1ab-42fa-b2a5-d37781652fb7
 md"
@@ -127,8 +127,8 @@ H, ω = freqresp(PolynomialRatio([1.0], [1.0, -1.5, 0.8]));
 
 # ╔═╡ db7e534b-42ad-465e-a9df-9e7a97859591
 begin
-	plot(freqₓ, Pavgₓ; label=L"\hat{S}_X(f)")
-	plot!(ω./2π, abs2.(H); label=L"S_X(f)")
+	plot(freqₓ, Pavgₓ; label=L"\hat{S}_{XX}(f)")
+	plot!(ω./2π, abs2.(H); label=L"S_{XX}(f)")
 	xlabel!("Frequency [Hz]");
 	ylabel!("Power");
 	title!("Theoretical and Estimated PSDs for X[n]");
@@ -136,31 +136,87 @@ begin
 end
 
 # ╔═╡ fc05f712-7072-4ed8-aaaa-d04e6387cc8f
-Ŝₓ = fft([Rₓ; zeros(512-length(Rₓ))]) |> fftshift; # 512-pt fft
+Ŝₓₓ = fft([Rₓₓ; zeros(512-length(Rₓₓ))]) |> fftshift; # 512-pt fft
 
 # ╔═╡ 041a791a-2f30-4912-b937-64c8879e8829
 let
-	Nsigₓ = length(Ŝₓ);
+	Nsigₓ = length(Ŝₓₓ);
 	freqₓ = fftfreq(Nsigₓ) |> fftshift;
 	freqₓ = freqₓ[1+Nsigₓ÷2:end];
-	plot(freqₓ, abs.(Ŝₓ)[1+Nsigₓ÷2:end]; label=L"\hat{S}_X(f)")
+	plot(freqₓ, abs.(Ŝₓₓ)[1+Nsigₓ÷2:end]; label=L"\hat{S}_{XX}(f)")
 	xlabel!("Frequency [Hz]");
 	ylabel!("Power");
 	title!("Wiener-Khinchin PSD Estimate for X[n]");
-	plot!(; xlims=(freqₓ[1], freqₓ[end]), ylims=(0, maximum(abs.(Ŝₓ))))
+	plot!(; xlims=(freqₓ[1], freqₓ[end]), ylims=(0, maximum(abs.(Ŝₓₓ))))
 end
 
 # ╔═╡ 0ed9d1b4-87d3-4ea8-8315-9532702db7c1
-# yule-walker
+md"
+
+Now, to estimate the AR filter coefficients, we can use the Yule-Walker equations, for $$p$$-lags.
+
+$$\underbrace{\begin{bmatrix}
+	R_{XX}[1]\\
+	R_{XX}[2]\\
+	\vdots\\
+	R_{XX}[p]
+\end{bmatrix}}_{\mathbf{r}_X}
+=
+\underbrace{\begin{bmatrix}
+	R_{XX}[0] & R_{XX}[-1] & \ldots & R_{XX}[1-p]\\
+	R_{XX}[1] & R_{XX}[0]  & \ldots & R_{XX}[2-p]\\
+	\vdots    & \vdots     & \vdots & \vdots\\
+	R_{XX}[p-1] & R_{XX}[p-2] & \ldots  & R_{XX}[0]
+\end{bmatrix}}_{R_X}
+\underbrace{\begin{bmatrix}
+	h[0]\\
+	h[1]\\
+	\vdots\\
+	h[p-1]
+\end{bmatrix}}_{\mathbf{h}}$$
+
+Thus, we can get an estimate of the filter coefficients $$\mathbf{h}$$ by,
+
+$$\mathbf{h} = R_X^{-1}\mathbf{r}_X$$
+
+Also, note again that $$R_{XX}[k] = R_{XX}[-k]$$ since autocorrelation for a WSS process is an even function of one variable.
+
+"
+
+# ╔═╡ 582d82ac-278e-40e6-bce1-0d96b2d4a33d
+rₓ(p) = Rₓₓ[52:52+p-1]
+
+# ╔═╡ 02c62354-7623-4fc0-961a-e54783edaaeb
+Rₓ(p) = hcat([Rₓₓ[51-k:51+p-1-k] for k ∈ 0:p-1]...)
+
+# ╔═╡ a7f692e8-b9f1-43ab-a04c-f8d95472b6e2
+md"
+
+Now, the 3-tap, 4-tap, and 5-tap filters for the AR process are estimated below.
+
+"
+
+# ╔═╡ 42ca848c-b8cd-4ee1-bc27-2bbe544a0812
+h₃ = Rₓ(3)\rₓ(3)
+
+# ╔═╡ 254d7a79-4fba-4715-ba06-7ddd2d15acbe
+h₄ = Rₓ(4)\rₓ(4)
+
+# ╔═╡ c82c5eb7-64d2-4399-91a9-505389b10dbe
+h₅ = Rₓ(5)\rₓ(5)
 
 # ╔═╡ da88045d-31b3-4826-a18b-d5099a731df4
 md"
 
-## 2. Predicting Another Autoregressive Filter
+## 2. Optimal Linear Filters for Autoregressive Processes
 
 Here we consider a system excited by white noise (input) and produces a random sequence $$X_n$$ as output by the following relation,
 
-$$S_n = 0.2S_{n-1} - 0.8X_{n-2} + N_n$$
+$$S_n = 0.2S_{n-1} - 0.8S_{n-2} + N_n$$
+
+Now, we create an observation vector with measurement noise, 
+
+$$Y[n] = S[n] + W[n]$$.
 
 "
 
@@ -177,13 +233,6 @@ end
 # ╔═╡ 76657d61-252a-4242-ba7c-fdb25a13e69b
 Sn = Sₙ(Nn)[89:end]; # using only the last 512 samples
 
-# ╔═╡ ca2c65e3-8f3f-4068-89cc-b67150991d05
-md"
-
-Now, we create an observation vector with measurement noise.
-
-"
-
 # ╔═╡ c7affb78-afb6-4e8b-8d65-fd9baaab72f7
 Wn = rand.(Nₙ(length(Sn)));
 
@@ -191,7 +240,7 @@ Wn = rand.(Nₙ(length(Sn)));
 Yn = Sn + Wn;
 
 # ╔═╡ 23a2b949-c9ab-46e6-be1e-783c233522a7
-function crosscorr(X, Y; nlags=nothing)
+function crosscorr(X, Y; nlags=nothing) # assumes joint ergodicity of X and Y
 	nₓ = length(X); nᵧ = length(Y); n = min(nₓ, nᵧ);
 	L = (nlags === nothing) ? n-1 : 
 		((0 < nlags < n) ? nlags : throw(AssertionError("0 ≮ nlags ≰ min(nₓ, nᵧ)-1"))); 
@@ -219,10 +268,10 @@ Autocorrelation of Y[n]. Show why it is WSS.
 "
 
 # ╔═╡ d8588c8c-74f4-4805-bbf5-26fd50d85dc1
-Rᵧ = crosscorr(Yn, Yn; nlags=256);
+Rᵧᵧ = crosscorr(Yn, Yn; nlags=256);
 
 # ╔═╡ 24be5f35-ea19-45ba-85cd-8c1dc143a0fd
-plot(Rᵧ; title=L"\hat{R}_{YY}(\tau)", legend=false, xticks=(1:64:513, -256:64:256))
+plot(Rᵧᵧ; title=L"\hat{R}_{YY}(\tau)", legend=false, xticks=(1:64:513, -256:64:256))
 
 # ╔═╡ da25ccc1-0e04-4e94-a3b6-2e690280b85b
 Rₛᵧ = crosscorr(Sn, Yn; nlags=256);
@@ -240,16 +289,76 @@ The 7-element optimal filter as a linear estimator for $$S_n$$ is given by,
 
 $$Z_n = \sum_{k=0}^6 h[k] Y[n-k]$$
 
-And the theoretical minimum mean-sqaured error for the above optimal filter is given by,
+where, in general, a $$p$$-tap filter impulse response $$h[n]$$ satisfies the Wiener-Hopf equations, which in the discrete-FIR case are _similar_ to the Yule-Walker equations as FIR prediction coefficients act as estimated AR parameters!
+
+$$\underbrace{\begin{bmatrix}
+	R_{SY}[0]\\
+	R_{SY}[1]\\
+	\vdots\\
+	R_{SY}[p-1]
+\end{bmatrix}}_{\mathbf{r}_{SY}}
+=
+\underbrace{\begin{bmatrix}
+	R_{YY}[0] & R_{YY}[-1] & \ldots & R_{YY}[1-p]\\
+	R_{YY}[1] & R_{YY}[0]  & \ldots & R_{YY}[2-p]\\
+	\vdots    & \vdots     & \vdots & \vdots\\
+	R_{YY}[p-1] & R_{YY}[p-2] & \ldots  & R_{YY}[0]
+\end{bmatrix}}_{R_Y}
+\underbrace{\begin{bmatrix}
+	h[0]\\
+	h[1]\\
+	\vdots\\
+	h[p-1]
+\end{bmatrix}}_{\mathbf{h}}$$
+
+Thus, we get $$\mathbf{h} = R_{Y}^{-1}\mathbf{r}_{SY}$$.
+
+The theoretical minimum mean-sqaured error for the above optimal filter is given by,
 
 $$E[e_n^2] = R_{SS}[0] - \sum_{k=0}^6 h[k] R_{SY}[k]$$
 
 This should ideally be close to the empirical variance of the process $$(S_n - Z_n)$$, both being zero mean processes.
 
+Note above that $$R_{SS}[0]$$ is the average power that is also given by,
+
+$$R_{SS}[0] = P_S = \lim_{N\to\infty}\frac{1}{2N+1}\sum_{n=-N}^{N}S[n] \approx \frac{1}{N_S}\sum_{n=-\frac{N_S}{2}}^{\frac{N_S}{2}}S[n]$$
+
 "
 
-# ╔═╡ 907b751b-2c3d-413c-a3f4-77fd2631cc59
+# ╔═╡ 89838b7f-28d1-46fe-80dd-e8835d7b4aaa
+md"
 
+In the code below, we first get the optimal linear estimator.
+
+"
+
+# ╔═╡ 34d35783-4183-46e9-b5ff-3cc387d174b8
+rₛᵧ(p) = Rₛᵧ[257:257+p-1]
+
+# ╔═╡ 8aded40f-4567-4d0a-82d2-958b72a433d4
+Rᵧ(p) = hcat([Rᵧᵧ[257-k:257+p-1-k] for k ∈ 0:p-1]...)
+
+# ╔═╡ 6b476f7a-752d-4247-b2b9-2b4b6de2c7b4
+h₇ = Rᵧ(7)\rₛᵧ(7)
+
+# ╔═╡ 70b01043-6994-41c8-b95d-d9404c7d7e2b
+md"
+
+Now, we test the filter for how close it is to the theoretical mse.
+
+"
+
+# ╔═╡ 18c297ad-c4f3-42fc-9810-953daefd7b07
+Zn = conv(h₇, Yn)
+
+# ╔═╡ ccaadf7f-215a-4c6b-a2d3-dc5fcc9082cd
+var(Sn-Zn[1:length(Sn)])
+
+# ╔═╡ 08c744d9-0f77-4e08-9246-0cc8ee211889
+Pₛ = (Sn' * Sn)/length(Sn)
+
+# ╔═╡ cb49e4dc-b89e-4f85-89e3-8917aaf5eebf
+mseₜₕ = Pₛ - sum(h₇ ⋅ Rₛᵧ[257:263])
 
 # ╔═╡ 32a99590-76a6-4207-ab7a-c47aa791750a
 md"
@@ -1333,11 +1442,16 @@ version = "0.9.1+5"
 # ╟─db7e534b-42ad-465e-a9df-9e7a97859591
 # ╠═fc05f712-7072-4ed8-aaaa-d04e6387cc8f
 # ╟─041a791a-2f30-4912-b937-64c8879e8829
-# ╠═0ed9d1b4-87d3-4ea8-8315-9532702db7c1
+# ╟─0ed9d1b4-87d3-4ea8-8315-9532702db7c1
+# ╠═582d82ac-278e-40e6-bce1-0d96b2d4a33d
+# ╠═02c62354-7623-4fc0-961a-e54783edaaeb
+# ╟─a7f692e8-b9f1-43ab-a04c-f8d95472b6e2
+# ╠═42ca848c-b8cd-4ee1-bc27-2bbe544a0812
+# ╠═254d7a79-4fba-4715-ba06-7ddd2d15acbe
+# ╠═c82c5eb7-64d2-4399-91a9-505389b10dbe
 # ╟─da88045d-31b3-4826-a18b-d5099a731df4
 # ╠═b6afa337-8ca0-4518-a03c-0df78c5d254f
 # ╠═76657d61-252a-4242-ba7c-fdb25a13e69b
-# ╟─ca2c65e3-8f3f-4068-89cc-b67150991d05
 # ╠═c7affb78-afb6-4e8b-8d65-fd9baaab72f7
 # ╠═0d32929f-0bea-4399-8556-efb31dd8ebf8
 # ╠═23a2b949-c9ab-46e6-be1e-783c233522a7
@@ -1348,7 +1462,15 @@ version = "0.9.1+5"
 # ╠═90bcadd6-9338-466d-9ef2-76e08a204c52
 # ╠═124ef33c-7c5e-43bf-b86c-7ee91200e82b
 # ╟─fa76fb42-3680-41bc-ad9c-f11407e78426
-# ╠═907b751b-2c3d-413c-a3f4-77fd2631cc59
+# ╟─89838b7f-28d1-46fe-80dd-e8835d7b4aaa
+# ╠═34d35783-4183-46e9-b5ff-3cc387d174b8
+# ╠═8aded40f-4567-4d0a-82d2-958b72a433d4
+# ╠═6b476f7a-752d-4247-b2b9-2b4b6de2c7b4
+# ╟─70b01043-6994-41c8-b95d-d9404c7d7e2b
+# ╠═18c297ad-c4f3-42fc-9810-953daefd7b07
+# ╠═ccaadf7f-215a-4c6b-a2d3-dc5fcc9082cd
+# ╠═08c744d9-0f77-4e08-9246-0cc8ee211889
+# ╠═cb49e4dc-b89e-4f85-89e3-8917aaf5eebf
 # ╟─32a99590-76a6-4207-ab7a-c47aa791750a
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
