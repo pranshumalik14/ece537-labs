@@ -46,22 +46,6 @@ function Xₙ(Nn)
 	return Xn
 end
 
-# ╔═╡ 702737f6-9b24-42f6-8cb4-3bd0dfc00d54
-function autocorr(X; nlags=nothing)
-	n = length(X); L = (nlags === nothing) ? n-1 : 
-		((nlags < n) ? nlags : throw(AssertionError("nlags > n-1"))); 
-	Rₓ = zeros(L+1);               # initial length = number of lags
-	
-	for m ∈ 1:L+1
-		for k ∈ 1:n-m+1
-			Rₓ[m] += X[k]*X[k+m-1] # add product terms
-		end
-		Rₓ[m] /= n-m+1             # normalize by number of terms
-	end
-
-	Rₓ = [reverse(Rₓ[2:end]); Rₓ]; # all lags [-L to L]
-end
-
 # ╔═╡ fdea5673-5d95-41fe-90e8-dd0bed409d49
 Nn = rand.(Nₙ(600));
 
@@ -74,14 +58,30 @@ plot(Nn; legend=false)
 # ╔═╡ 853c71f4-0298-4037-9c49-414dea8661f8
 plot(Xn; legend=false)
 
+# ╔═╡ 702737f6-9b24-42f6-8cb4-3bd0dfc00d54
+function autocorr(X; nlags=nothing)
+	n = length(X); L = (nlags === nothing) ? n-1 : 
+		((0 < nlags < n) ? nlags : throw(AssertionError("0 ≮ nlags ≰ n-1"))); 
+	Rₓ = zeros(L+1);                # initial length = number of lags
+	
+	for m ∈ 1:L+1
+		for k ∈ 1:n-m+1
+			Rₓ[m] += X[k]*X[k+m-1]; # add product terms
+		end
+		Rₓ[m] /= n-m+1;             # normalize by number of terms
+	end
+
+	Rₓ = [reverse(Rₓ[2:end]); Rₓ];  # all lags [-L to L]
+end
+
 # ╔═╡ c819f061-3475-4ae3-ae0c-c21744d5211e
 Rₙ = autocorr(Nn; nlags=50); Rₓ = autocorr(Xn; nlags=50);
 
 # ╔═╡ 76e66f3f-e7c1-45fd-9e24-c5efd5cec49d
-plot(Rₙ; title=L"\hat{R}_{NN}(\tau)", legend=false, xticks=(1:10:102, -50:10:51))
+plot(Rₙ; title=L"\hat{R}_{NN}(\tau)", legend=false, xticks=(1:10:101, -50:10:50))
 
 # ╔═╡ 039e4e9b-292c-48f5-abe2-76f7e04f0718
-plot(Rₓ; title=L"\hat{R}_{XX}(\tau)", legend=false, xticks=(1:10:102, -50:10:51))
+plot(Rₓ; title=L"\hat{R}_{XX}(\tau)", legend=false, xticks=(1:10:101, -50:10:50))
 
 # ╔═╡ 2ffec40b-eb94-4cd3-9212-096e9cd93c99
 md"
@@ -136,16 +136,18 @@ begin
 end
 
 # ╔═╡ fc05f712-7072-4ed8-aaaa-d04e6387cc8f
-Ŝₓ = fft(Rₓ) |> fftshift;
+Ŝₓ = fft([Rₓ; zeros(512-length(Rₓ))]) |> fftshift; # 512-pt fft
 
 # ╔═╡ 041a791a-2f30-4912-b937-64c8879e8829
 let
 	Nsigₓ = length(Ŝₓ);
 	freqₓ = fftfreq(Nsigₓ) |> fftshift;
-	plot(freqₓ[Nsigₓ÷2:end],abs.(Ŝₓ)[Nsigₓ÷2:end]; label=L"\hat{S}_X(f)")
+	freqₓ = freqₓ[1+Nsigₓ÷2:end];
+	plot(freqₓ, abs.(Ŝₓ)[1+Nsigₓ÷2:end]; label=L"\hat{S}_X(f)")
 	xlabel!("Frequency [Hz]");
 	ylabel!("Power");
 	title!("Wiener-Khinchin PSD Estimate for X[n]");
+	plot!(; xlims=(freqₓ[1], freqₓ[end]), ylims=(0, maximum(abs.(Ŝₓ))))
 end
 
 # ╔═╡ 0ed9d1b4-87d3-4ea8-8315-9532702db7c1
@@ -173,30 +175,81 @@ function Sₙ(Nn)
 end
 
 # ╔═╡ 76657d61-252a-4242-ba7c-fdb25a13e69b
+Sn = Sₙ(Nn)[89:end]; # using only the last 512 samples
 
+# ╔═╡ ca2c65e3-8f3f-4068-89cc-b67150991d05
+md"
 
-# ╔═╡ 124ef33c-7c5e-43bf-b86c-7ee91200e82b
-# todo: prove/motivate why S, X are jointly WSS to be able to use 1var crosscorr
+Now, we create an observation vector with measurement noise.
+
+"
+
+# ╔═╡ c7affb78-afb6-4e8b-8d65-fd9baaab72f7
+Wn = rand.(Nₙ(length(Sn)));
+
+# ╔═╡ 0d32929f-0bea-4399-8556-efb31dd8ebf8
+Yn = Sn + Wn;
 
 # ╔═╡ 23a2b949-c9ab-46e6-be1e-783c233522a7
 function crosscorr(X, Y; nlags=nothing)
 	nₓ = length(X); nᵧ = length(Y); n = min(nₓ, nᵧ);
 	L = (nlags === nothing) ? n-1 : 
-		((nlags < n) ? nlags : throw(AssertionError("nlags > min(nₓ, nᵧ)-1"))); 
-	Rₓᵧ = zeros(L+1);                 # initial length = number of lags
+		((0 < nlags < n) ? nlags : throw(AssertionError("0 ≮ nlags ≰ min(nₓ, nᵧ)-1"))); 
+	Rₓᵧ = zeros(L+1);                 # crosscorr for +ve lags; length = number of lags
+	X̃ = reverse(X); Ỹ = reverse(Y);   # flipped signals for negative lags
+	R̃ₓᵧ = zeros(L+1);                 # crosscorr for -ve lags; length = number of lags
 	
 	for m ∈ 1:L+1
 		for k ∈ 1:n-m+1
-			Rₓᵧ[m] += X[k]*Y[k+m-1]   # add product terms
+			Rₓᵧ[m] += X[k]*Y[k+m-1];  # add product terms
+			R̃ₓᵧ[m] += X̃[k]*Ỹ[k+m-1];
 		end
-		Rₓᵧ[m] /= n-m+1               # normalize by number of terms
+		Rₓᵧ[m] /= n-m+1;              # normalize by number of terms
+		R̃ₓᵧ[m] /= n-m+1;
 	end
 
-	Rₓᵧ = [reverse(Rₓᵧ[2:end]); Rₓᵧ]; # all lags [-L to L]
+	Rₓᵧ = [reverse(R̃ₓᵧ[2:end]); Rₓᵧ]; # all lags [-L to L]
 end
 
+# ╔═╡ bb056459-1084-4686-a2bf-5061ba772f80
+md"
+
+Autocorrelation of Y[n]. Show why it is WSS.
+
+"
+
+# ╔═╡ d8588c8c-74f4-4805-bbf5-26fd50d85dc1
+Rᵧ = crosscorr(Yn, Yn; nlags=256);
+
+# ╔═╡ 24be5f35-ea19-45ba-85cd-8c1dc143a0fd
+plot(Rᵧ; title=L"\hat{R}_{YY}(\tau)", legend=false, xticks=(1:64:513, -256:64:256))
+
+# ╔═╡ da25ccc1-0e04-4e94-a3b6-2e690280b85b
+Rₛᵧ = crosscorr(Sn, Yn; nlags=256);
+
+# ╔═╡ 90bcadd6-9338-466d-9ef2-76e08a204c52
+plot(Rₛᵧ; title=L"\hat{R}_{SY}(\tau)", legend=false, xticks=(1:64:513, -256:64:256))
+
+# ╔═╡ 124ef33c-7c5e-43bf-b86c-7ee91200e82b
+# todo: prove/motivate why S, X are jointly WSS to be able to use 1var crosscorr
+
+# ╔═╡ fa76fb42-3680-41bc-ad9c-f11407e78426
+md"
+
+The 7-element optimal filter as a linear estimator for $$S_n$$ is given by,
+
+$$Z_n = \sum_{k=0}^6 h[k] Y[n-k]$$
+
+And the theoretical minimum mean-sqaured error for the above optimal filter is given by,
+
+$$E[e_n^2] = R_{SS}[0] - \sum_{k=0}^6 h[k] R_{SY}[k]$$
+
+This should ideally be close to the empirical variance of the process $$(S_n - Z_n)$$, both being zero mean processes.
+
+"
+
 # ╔═╡ 907b751b-2c3d-413c-a3f4-77fd2631cc59
-# wiener-hopf
+
 
 # ╔═╡ 32a99590-76a6-4207-ab7a-c47aa791750a
 md"
@@ -1284,8 +1337,17 @@ version = "0.9.1+5"
 # ╟─da88045d-31b3-4826-a18b-d5099a731df4
 # ╠═b6afa337-8ca0-4518-a03c-0df78c5d254f
 # ╠═76657d61-252a-4242-ba7c-fdb25a13e69b
-# ╠═124ef33c-7c5e-43bf-b86c-7ee91200e82b
+# ╟─ca2c65e3-8f3f-4068-89cc-b67150991d05
+# ╠═c7affb78-afb6-4e8b-8d65-fd9baaab72f7
+# ╠═0d32929f-0bea-4399-8556-efb31dd8ebf8
 # ╠═23a2b949-c9ab-46e6-be1e-783c233522a7
+# ╟─bb056459-1084-4686-a2bf-5061ba772f80
+# ╠═d8588c8c-74f4-4805-bbf5-26fd50d85dc1
+# ╠═24be5f35-ea19-45ba-85cd-8c1dc143a0fd
+# ╠═da25ccc1-0e04-4e94-a3b6-2e690280b85b
+# ╠═90bcadd6-9338-466d-9ef2-76e08a204c52
+# ╠═124ef33c-7c5e-43bf-b86c-7ee91200e82b
+# ╟─fa76fb42-3680-41bc-ad9c-f11407e78426
 # ╠═907b751b-2c3d-413c-a3f4-77fd2631cc59
 # ╟─32a99590-76a6-4207-ab7a-c47aa791750a
 # ╟─00000000-0000-0000-0000-000000000001
