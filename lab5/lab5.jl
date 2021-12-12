@@ -16,8 +16,6 @@ md"
 # ECE537: Lab 5 Report
 > _It is recommended to access this report by opening the `html` file on the browser or by clicking [here](https://pranshumalik14.github.io/ece537-labs/lab5/lab5.jl.html)_.
 
-In the first part of the lab, we will be <>.
-
 Throughout this lab, the [Distributions.jl](https://github.com/JuliaStats/Distributions.jl) package in Julia has been utilized to be able to use the probability constructs in code.
 
 "
@@ -27,9 +25,11 @@ md"
 
 ## 1. Autoregressive Filters and Coefficient Estimation
 
-Here we consider a system excited by white noise input $$N_n \sim \mathcal{N}(0, 1)$$ and produces a random sequence $$X_n$$ as output by the following relation,
+Here we consider a system excited by i.i.d. white Gaussian noise $$N[n] \sim \mathcal{N}(0, 1)$$ and produces a random sequence $$X[n]$$ as output by the following autoregressive (AR) difference relation,
 
-$$X_n = 1.5X_{n-1} - 0.8X_{n-2} + N_n$$
+$$X[n] = 1.5X[n-1] - 0.8X[n-2] + N[n]$$
+
+We will now simulate this process in the code below.
 
 "
 
@@ -53,10 +53,19 @@ Nn = rand.(Nₙ(600));
 Xn = Xₙ(Nn)[89:end]; # using only the last 512 samples
 
 # ╔═╡ 80b490a8-4e8f-4ea2-9384-f68bd94c255c
-plot(Nn; legend=false)
+plot(Nn[89:end]; title=L"N[n]", xlabel=L"n", ylabel="Amplitude", legend=false)
 
 # ╔═╡ 853c71f4-0298-4037-9c49-414dea8661f8
-plot(Xn; legend=false)
+plot(Xn; title=L"X[n]", xlabel=L"n", ylabel="Amplitude", legend=false)
+
+# ╔═╡ a25a39cd-914f-4905-b013-1cdc81d5e014
+md"
+
+Note above that $$N[n]$$ looks like expected, uncorrelated white Gaussian noise, mostly between 0 to 1. A realization above of the process $$X[n]$$ is highly amplified with respect to the input signal, largely because of accumulation and scaling factors. It also varies less rapidly than the input $$N[n]$$.
+
+We now compute the sample autocorrelation functions of both processes below. Note that we are presuming these processes to be Ergodic in nature and therefore taking sample autocorrelation as close estimates $$\hat{R}[\tau]$$ of the true autocorrelation function $$R[\tau]$$. The validity of this assumption will be tested at each step.
+
+"
 
 # ╔═╡ 702737f6-9b24-42f6-8cb4-3bd0dfc00d54
 function autocorr(X; nlags=nothing) # assumes ergodicity of X
@@ -78,15 +87,30 @@ end
 Rₙₙ = autocorr(Nn; nlags=50); Rₓₓ = autocorr(Xn; nlags=50);
 
 # ╔═╡ 76e66f3f-e7c1-45fd-9e24-c5efd5cec49d
-plot(Rₙₙ; title=L"\hat{R}_{NN}(\tau)", legend=false, xticks=(1:10:101, -50:10:50))
+plot(Rₙₙ; title=L"\hat{R}_{NN}[\tau]", xlabel="τ, Lags", legend=false, xticks=(1:10:101, -50:10:50))
 
 # ╔═╡ 039e4e9b-292c-48f5-abe2-76f7e04f0718
-plot(Rₓₓ; title=L"\hat{R}_{XX}(\tau)", legend=false, xticks=(1:10:101, -50:10:50))
+plot(Rₓₓ; title=L"\hat{R}_{XX}[\tau]", xlabel="τ, Lags", legend=false, xticks=(1:10:101, -50:10:50))
+
+# ╔═╡ 6e746fdf-90e7-4269-b050-8303d89e048f
+md"
+
+From above we can see that the autocorrelation function $$\hat{R}_{NN}[\tau]$$ shows that $$N[n]$$ is uncorrelated as expected since at 0 lag it is close to 1 and it sharply drops to 0 for other values of lag, $$\tau$$. On the other hand, from the plot for $$\hat{R}_{XX}[\tau]$$ we can see that its adjacent samples are highly correlated and no longer i.i.d. (as the input) due to the AR difference relation.
+
+The average power for the signals is given by the respective autocorrelation functions evaluated at $$\tau=0$$, where we are assuming (and also know) them to be WSS. The values are shown below.
+
+"
+
+# ╔═╡ 3e6ed055-09d5-4d1a-94d9-4e12e03a7f98
+Rₙₙ[51]
+
+# ╔═╡ c6104de7-b35e-4d39-8d60-bbb6738b0182
+Rₓₓ[51]
 
 # ╔═╡ 2ffec40b-eb94-4cd3-9212-096e9cd93c99
 md"
 
-10 realizations and periodogram.
+We now estimate the power spectral density (PSD) $$S_{XX}(f)$$ by averaging over 10 periodograms of independent realizations of the process $$X[n]$$.
 
 "
 
@@ -108,17 +132,17 @@ md"
 
 Here, we take a step back and consider a general AR filter given by,
 
-$$X_n = −\sum_{p=1}^{P}a_pX_{n-p} + N_n$$
+$$X[n] = −\sum_{p=1}^{P}a_pX[n-p] + N[n]$$
 
-For this formulation of an AR filter, we have its Z-transform given by, $$H(z) = \frac{1}{A(z)}$$, where,
+From the above input-output difference equation formulation of the AR filter, we have the filter's Z-transform given by, $$H(z) = \frac{1}{A(z)}$$, where,
 
 $$A(z) = 1 + \sum_{p=1}^Pa_pz^{-p}$$
 
 Thus, the output spectral density is given by,
 
-$$S_X(f) = \sigma_N^2\frac{1}{|A(f)|^2}$$
+$$S_{XX}(f) = \sigma_N^2\frac{1}{|A(f)|^2}$$
 
-In our case, we have $$H(z) = \frac{1}{1-1.5z^{-1} + 0.8z^{-2}}$$ and we get its magnitude response using the `freqresp` fucntion in the [DSP.jl](https://github.com/JuliaDSP/DSP.jl) package.
+In our case, we have $$H(z) = \frac{1}{1-1.5z^{-1} + 0.8z^{-2}}$$ and we get its magnitude response using the `freqresp` fucntion in the [DSP.jl](https://github.com/JuliaDSP/DSP.jl) package. This is the theoretical PSD for the AR process and we plot it against the estimate calculated above.
 
 "
 
@@ -134,6 +158,13 @@ begin
 	title!("Theoretical and Estimated PSDs for X[n]");
 	plot!(; xlims=(freqₓ[1],freqₓ[end]), ylims=(0, maximum(Pavgₓ))) |> as_svg
 end
+
+# ╔═╡ bce2867c-d30d-4311-986e-3632fb2e843d
+md"
+
+There is a difference in the amplitudes between the estimate and true values, but they follow the same trend and once normalized they should match very closely. We also know by the Wiener-Khinchin theorem, that we can get the PSD of the WSS random process from the Fourier transform of its autocorrelation function. We calulate and plot it below.
+
+"
 
 # ╔═╡ fc05f712-7072-4ed8-aaaa-d04e6387cc8f
 Ŝₓₓ = fft([Rₓₓ; zeros(512-length(Rₓₓ))]) |> fftshift; # 512-pt fft
@@ -152,6 +183,8 @@ end
 
 # ╔═╡ 0ed9d1b4-87d3-4ea8-8315-9532702db7c1
 md"
+
+We can observe that the above estimate more closely resembles the true spectral density in both shape (less abrupt jumps) and magnitude than the periodogram. It is also worthy to note that all estimates still have a peak just before 0.1 Hz and thereafter decay to zero quickly.
 
 Now, to estimate the AR filter coefficients, we can use the Yule-Walker equations, for $$p$$-lags.
 
@@ -192,7 +225,7 @@ Rₓ(p) = hcat([Rₓₓ[51-k:51+p-1-k] for k ∈ 0:p-1]...)
 # ╔═╡ a7f692e8-b9f1-43ab-a04c-f8d95472b6e2
 md"
 
-Now, the 3-tap, 4-tap, and 5-tap filters for the AR process are estimated below.
+The 3-tap, 4-tap, and 5-tap filters for the AR process are estimated below.
 
 "
 
@@ -205,18 +238,27 @@ h₄ = Rₓ(4)\rₓ(4)
 # ╔═╡ c82c5eb7-64d2-4399-91a9-505389b10dbe
 h₅ = Rₓ(5)\rₓ(5)
 
+# ╔═╡ c08b6b77-0157-4bb1-8514-de2fb9a8a236
+md"
+
+Note above that the first two coefficients of the filter closely match the AR coefficients of $$\begin{bmatrix}1.5 & 0.8\end{bmatrix}$$ after which all components are very close to zero. This makes sense as the true filter only has two components and therefore rest of the components in the estimated filters are redundant.
+
+"
+
 # ╔═╡ da88045d-31b3-4826-a18b-d5099a731df4
 md"
 
 ## 2. Optimal Linear Filters for Autoregressive Processes
 
-Here we consider a system excited by white noise (input) and produces a random sequence $$X_n$$ as output by the following relation,
+Here we consider another system excited by same i.i.d. white Guassian noise process $$N[n]$$ as before, and it produces a random sequence $$S[n]$$ at the output which is given by the following AR difference relation,
 
-$$S_n = 0.2S_{n-1} - 0.8S_{n-2} + N_n$$
+$$S[n] = 0.2S[n-1] - 0.8S[n-2] + N[n]$$
 
-Now, we create an observation vector with measurement noise, 
+We then simulate the observation of this signal and introduce some measurement i.i.d. noise $$W[n] \sim \mathcal{N}(0,1)$$ which is independent to $$N[n]$$. The observed sequence is thus given by the relation, 
 
-$$Y[n] = S[n] + W[n]$$.
+$$Y[n] = S[n] + W[n]$$
+
+Both processes are simulated in code below.
 
 "
 
@@ -239,6 +281,13 @@ Wn = rand.(Nₙ(length(Sn)));
 # ╔═╡ 0d32929f-0bea-4399-8556-efb31dd8ebf8
 Yn = Sn + Wn;
 
+# ╔═╡ 82bafa76-0d2e-4642-af6f-9e4b94f2c0c3
+md"
+
+We now calculate the sample cross-correlation function of $$Y[n]$$ to estimate its autocorrelation $$\hat{R}_{YY}[\tau]$$ without replicating values for negative lags. This has been done to properly test for the evenness of the true autocorrelation $$R_{YY}[\tau]$$.
+
+"
+
 # ╔═╡ 23a2b949-c9ab-46e6-be1e-783c233522a7
 function crosscorr(X, Y; nlags=nothing) # assumes joint ergodicity of X and Y
 	nₓ = length(X); nᵧ = length(Y); n = min(nₓ, nᵧ);
@@ -260,36 +309,37 @@ function crosscorr(X, Y; nlags=nothing) # assumes joint ergodicity of X and Y
 	Rₓᵧ = [reverse(R̃ₓᵧ[2:end]); Rₓᵧ]; # all lags [-L to L]
 end
 
-# ╔═╡ bb056459-1084-4686-a2bf-5061ba772f80
-md"
-
-Autocorrelation of Y[n]. Show why it is WSS.
-
-"
-
 # ╔═╡ d8588c8c-74f4-4805-bbf5-26fd50d85dc1
 Rᵧᵧ = crosscorr(Yn, Yn; nlags=256);
 
 # ╔═╡ 24be5f35-ea19-45ba-85cd-8c1dc143a0fd
-plot(Rᵧᵧ; title=L"\hat{R}_{YY}(\tau)", legend=false, xticks=(1:64:513, -256:64:256))
+plot(Rᵧᵧ; title=L"\hat{R}_{YY}[\tau]", legend=false, xlabel="τ, Lags", xticks=(1:64:513, -256:64:256))
+
+# ╔═╡ 3c63b554-a494-49b5-a54d-2e22240ab3f7
+md"
+
+We can visually observe that $$\hat{R}_{YY}[\tau]$$ is an even function, even though on some runs it may have a slight non-symmetry on a few positive and negative lags, but overall this trend hints at the WSS nature of the process. Therefore, as $$Y[n]$$ is a real-valued signal, we can expect the evenness of the autocorrelation process $$R_{YY}[\tau]$$.
+
+We now estimate the cross-correlation of the processes $$Y[n]$$ and $$S[n]$$.
+
+"
 
 # ╔═╡ da25ccc1-0e04-4e94-a3b6-2e690280b85b
 Rₛᵧ = crosscorr(Sn, Yn; nlags=256);
 
 # ╔═╡ 90bcadd6-9338-466d-9ef2-76e08a204c52
-plot(Rₛᵧ; title=L"\hat{R}_{SY}(\tau)", legend=false, xticks=(1:64:513, -256:64:256))
-
-# ╔═╡ 124ef33c-7c5e-43bf-b86c-7ee91200e82b
-# todo: prove/motivate why S, X are jointly WSS to be able to use 1var crosscorr
+plot(Rₛᵧ; title=L"\hat{R}_{SY}[\tau]", legend=false, xlabel="τ, Lags", xticks=(1:64:513, -256:64:256))
 
 # ╔═╡ fa76fb42-3680-41bc-ad9c-f11407e78426
 md"
 
-The 7-element optimal filter as a linear estimator for $$S_n$$ is given by,
+From the plot above, we can see that $$R_{SY}[\tau]$$ is not a perfectly even function (notice points around $$\tau = \approx 0, \pm 64, \pm 192, \ldots$$); however, it is nearly symmetrical as it shows similar trends for positive and negative lags, and furthermore, it also resembles $$\hat{R}_{YY}[\tau]$$. Note that, in general, the cross-correlation function will not be perfectly symmetric (even) unless the processes are jointly WSS. Here we have $$Y[n]$$ corrupted version of $$S[n]$$ due to (independent) noise, and we can (numerically) assume the joint WSS nature of the two signals as the plot also suggests. This will allow us to derive optimal linear filters to estimate the underlying signal $$S[n]$$ from the measured sequence $$Y[n]$$.
 
-$$Z_n = \sum_{k=0}^6 h[k] Y[n-k]$$
+Following the assumption above, we would now like to design a 7-tap optimal filter as a linear estimator for $$S_n$$ which is given by,
 
-where, in general, a $$p$$-tap filter impulse response $$h[n]$$ satisfies the Wiener-Hopf equations, which in the discrete-FIR case are _similar_ to the Yule-Walker equations as FIR prediction coefficients act as estimated AR parameters!
+$$Z[n] = \sum_{k=0}^6 h[k] Y[n-k] = (Y \star h)[n]$$
+
+where, in general, a $$p$$-tap filter impulse response $$h[n]$$ satisfies the Wiener-Hopf equations, which in the discrete-FIR case are _similar_ to the Yule-Walker equations as (causal) FIR prediction coefficients act as estimated AR parameters!
 
 $$\underbrace{\begin{bmatrix}
 	R_{SY}[0]\\
@@ -323,12 +373,7 @@ Note above that $$R_{SS}[0]$$ is the average power that is also given by,
 
 $$R_{SS}[0] = P_S = \lim_{N\to\infty}\frac{1}{2N+1}\sum_{n=-N}^{N}S[n] \approx \frac{1}{N_S}\sum_{n=-\frac{N_S}{2}}^{\frac{N_S}{2}}S[n]$$
 
-"
-
-# ╔═╡ 89838b7f-28d1-46fe-80dd-e8835d7b4aaa
-md"
-
-In the code below, we first get the optimal linear estimator.
+In the code below, we first calculate the optimal linear estimator.
 
 "
 
@@ -344,12 +389,15 @@ h₇ = Rᵧ(7)\rₛᵧ(7)
 # ╔═╡ 70b01043-6994-41c8-b95d-d9404c7d7e2b
 md"
 
-Now, we test the filter for how close it is to the theoretical mse.
+Now, we test the filter for how close it is to the theoretical mean-squared error (MSE) and also plot the first 100 samples of both processes to demonstrate the working of the optimal filter.
 
 "
 
 # ╔═╡ 18c297ad-c4f3-42fc-9810-953daefd7b07
 Zn = conv(h₇, Yn)
+
+# ╔═╡ 10748495-62c4-45bf-a4b8-92d0afadd2ab
+plot(Zn[1:100]; title="Evolution of first 100 samples of Z[n] and S[n]", ylabel="Amplitude", xlabel=L"n", label=L"Z[n]"); plot!(Sn[1:100]; label=L"S[n]")
 
 # ╔═╡ ccaadf7f-215a-4c6b-a2d3-dc5fcc9082cd
 var(Sn-Zn[1:length(Sn)])
@@ -359,6 +407,13 @@ Pₛ = (Sn' * Sn)/length(Sn)
 
 # ╔═╡ cb49e4dc-b89e-4f85-89e3-8917aaf5eebf
 mseₜₕ = Pₛ - sum(h₇ ⋅ Rₛᵧ[257:263])
+
+# ╔═╡ 15382a52-30b8-45fc-ab5c-942cf7e23da7
+md"
+
+And indeed, as expected by the Wiener-Hopf equations, the optimal linear estimator is close to the minimum MSE.
+
+"
 
 # ╔═╡ 32a99590-76a6-4207-ab7a-c47aa791750a
 md"
@@ -1427,12 +1482,16 @@ version = "0.9.1+5"
 # ╠═7d6a5b3a-5b43-4d45-bc7a-443d209a006c
 # ╠═fdea5673-5d95-41fe-90e8-dd0bed409d49
 # ╠═d980f36c-7de2-4cb2-8b04-48c5406cc55e
-# ╠═80b490a8-4e8f-4ea2-9384-f68bd94c255c
-# ╠═853c71f4-0298-4037-9c49-414dea8661f8
+# ╟─80b490a8-4e8f-4ea2-9384-f68bd94c255c
+# ╟─853c71f4-0298-4037-9c49-414dea8661f8
+# ╟─a25a39cd-914f-4905-b013-1cdc81d5e014
 # ╠═702737f6-9b24-42f6-8cb4-3bd0dfc00d54
 # ╠═c819f061-3475-4ae3-ae0c-c21744d5211e
-# ╠═76e66f3f-e7c1-45fd-9e24-c5efd5cec49d
-# ╠═039e4e9b-292c-48f5-abe2-76f7e04f0718
+# ╟─76e66f3f-e7c1-45fd-9e24-c5efd5cec49d
+# ╟─039e4e9b-292c-48f5-abe2-76f7e04f0718
+# ╟─6e746fdf-90e7-4269-b050-8303d89e048f
+# ╠═3e6ed055-09d5-4d1a-94d9-4e12e03a7f98
+# ╠═c6104de7-b35e-4d39-8d60-bbb6738b0182
 # ╟─2ffec40b-eb94-4cd3-9212-096e9cd93c99
 # ╠═d5758039-65ff-4f90-ae41-a4932c725c22
 # ╠═6192ac4f-d1e4-4c09-8670-51b7c80ade68
@@ -1440,6 +1499,7 @@ version = "0.9.1+5"
 # ╟─59e78499-a1ab-42fa-b2a5-d37781652fb7
 # ╠═a0550cf5-0451-475b-bb20-1de14182e274
 # ╟─db7e534b-42ad-465e-a9df-9e7a97859591
+# ╟─bce2867c-d30d-4311-986e-3632fb2e843d
 # ╠═fc05f712-7072-4ed8-aaaa-d04e6387cc8f
 # ╟─041a791a-2f30-4912-b937-64c8879e8829
 # ╟─0ed9d1b4-87d3-4ea8-8315-9532702db7c1
@@ -1449,28 +1509,30 @@ version = "0.9.1+5"
 # ╠═42ca848c-b8cd-4ee1-bc27-2bbe544a0812
 # ╠═254d7a79-4fba-4715-ba06-7ddd2d15acbe
 # ╠═c82c5eb7-64d2-4399-91a9-505389b10dbe
+# ╟─c08b6b77-0157-4bb1-8514-de2fb9a8a236
 # ╟─da88045d-31b3-4826-a18b-d5099a731df4
 # ╠═b6afa337-8ca0-4518-a03c-0df78c5d254f
 # ╠═76657d61-252a-4242-ba7c-fdb25a13e69b
 # ╠═c7affb78-afb6-4e8b-8d65-fd9baaab72f7
 # ╠═0d32929f-0bea-4399-8556-efb31dd8ebf8
+# ╟─82bafa76-0d2e-4642-af6f-9e4b94f2c0c3
 # ╠═23a2b949-c9ab-46e6-be1e-783c233522a7
-# ╟─bb056459-1084-4686-a2bf-5061ba772f80
 # ╠═d8588c8c-74f4-4805-bbf5-26fd50d85dc1
-# ╠═24be5f35-ea19-45ba-85cd-8c1dc143a0fd
+# ╟─24be5f35-ea19-45ba-85cd-8c1dc143a0fd
+# ╟─3c63b554-a494-49b5-a54d-2e22240ab3f7
 # ╠═da25ccc1-0e04-4e94-a3b6-2e690280b85b
-# ╠═90bcadd6-9338-466d-9ef2-76e08a204c52
-# ╠═124ef33c-7c5e-43bf-b86c-7ee91200e82b
+# ╟─90bcadd6-9338-466d-9ef2-76e08a204c52
 # ╟─fa76fb42-3680-41bc-ad9c-f11407e78426
-# ╟─89838b7f-28d1-46fe-80dd-e8835d7b4aaa
 # ╠═34d35783-4183-46e9-b5ff-3cc387d174b8
 # ╠═8aded40f-4567-4d0a-82d2-958b72a433d4
 # ╠═6b476f7a-752d-4247-b2b9-2b4b6de2c7b4
 # ╟─70b01043-6994-41c8-b95d-d9404c7d7e2b
 # ╠═18c297ad-c4f3-42fc-9810-953daefd7b07
+# ╟─10748495-62c4-45bf-a4b8-92d0afadd2ab
 # ╠═ccaadf7f-215a-4c6b-a2d3-dc5fcc9082cd
 # ╠═08c744d9-0f77-4e08-9246-0cc8ee211889
 # ╠═cb49e4dc-b89e-4f85-89e3-8917aaf5eebf
+# ╟─15382a52-30b8-45fc-ab5c-942cf7e23da7
 # ╟─32a99590-76a6-4207-ab7a-c47aa791750a
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
