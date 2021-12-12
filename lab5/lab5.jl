@@ -202,10 +202,10 @@ $$\underbrace{\begin{bmatrix}
 	R_{XX}[p-1] & R_{XX}[p-2] & \ldots  & R_{XX}[0]
 \end{bmatrix}}_{R_X}
 \underbrace{\begin{bmatrix}
-	h[0]\\
 	h[1]\\
+	h[2]\\
 	\vdots\\
-	h[p-1]
+	h[p]
 \end{bmatrix}}_{\mathbf{h}}$$
 
 Thus, we can get an estimate of the filter coefficients $$\mathbf{h}$$ by,
